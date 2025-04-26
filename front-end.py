@@ -14,6 +14,8 @@ def preset_states():
         st.session_state.selected_file = None
     if "login_form_response" not in st.session_state:
         st.session_state.login_form_response = ["", False]
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
 
 def set_response(response: str, status: bool):
@@ -127,7 +129,7 @@ def sidebar():
     """, unsafe_allow_html=True)
 
 # ------------------------------ choose another file
-    # file list, each is a button to navigate to the corresponding file
+    # file list, each is a button to navigate to the corresponding file 
     st.sidebar.subheader("Your file list")
     if len(st.session_state.file_list) != 0:
         for idx, file in enumerate(st.session_state.file_list):
@@ -142,10 +144,10 @@ def sidebar():
                     response = requests.get(API_URL + f"chat/{file["id"]}")
                     if response.status_code == 200:
                         history = response.json()
-                        st.session_state.message = history["history"]
+                        st.session_state.messages = history["history"]
+                        st.rerun()
                     else:
                         st.error("Something went wrong D:")
-                st.rerun()
     else:
         st.sidebar.caption("empty...")
 

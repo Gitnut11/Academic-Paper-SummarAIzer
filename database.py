@@ -159,7 +159,7 @@ class Database:
 
     # get chat history
     def get_history(self, file_id):
-        table_name = "chatlog_" + file_id
+        table_name = "chatlog_" + str(file_id)
         self.cursor.execute(f'''
             SELECT role, text
             FROM (
@@ -177,7 +177,7 @@ class Database:
     
     # save chat message
     def log_chat(self, id, text, role):
-        table_name = "chatlog_" + id
+        table_name = "chatlog_" + str(id)
         self.cursor.execute(f'''
             INSERT INTO {table_name} (role, text) VALUES ('{role}', '{text}')
         ''')

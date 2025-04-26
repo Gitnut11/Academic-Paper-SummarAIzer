@@ -22,7 +22,6 @@ def login(username: str = Form(...), password: str = Form(...)):
     user_id = db.login(username, password)
     if user_id:
         file_list = db.get_user_files(user_id)
-        print(file_list)
         db.close()
         return {"user_id": user_id, "files": file_list}
     db.close()
@@ -57,13 +56,13 @@ def pdf(id: int):
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
-@app.get("/chat/{id}")
-def chat(id: int):
+@app.get("/chat/{file_id}")
+def chat(file_id: int):
     db = Database()
     try:
-        chat_history = db.get_history(id)
+        chat_history = db.get_history(file_id)
         db.close()
-        return chat_history
+        return JSONResponse(content={"history": chat_history})
     except Exception as e:
         db.close()
         return JSONResponse(content={"error": str(e)}, status_code=500)
