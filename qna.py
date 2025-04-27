@@ -6,43 +6,21 @@ import uuid
 import fitz
 import spacy
 from dotenv import load_dotenv
-from langchain_experimental.text_splitter import SemanticChunker  
-
-# from langchain_experimental.text_splitter import SemanticChunker
+from langchain_experimental.text_splitter import SemanticChunker
 from langchain_google_genai import GoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from neo4j import GraphDatabase
-from pydantic import BaseModel
+from prompt import QNA_PROMPT
 
-spacy.cli.download("en_core_web_sm")
+#======== Comment when using docker
+# spacy.cli.download("en_core_web_sm")
+#========
 
-PROMPT = """You are a professional AI assistant.
-
-Below are several reference paragraphs provided as context. 
-Based solely on the information contained in these paragraphs, answer the user's question.
-
-**Instructions:**
-- Only use information from the provided paragraphs. Do not make up or hallucinate any additional information.
-- Answer using the same language as the user's question, if the question's language and the reference paragraphs' language are different, translate the answer to the user's language.
-- Include the references in the answer. Use the format: `References: [{{excerpt}}]` where `{{excerpt}}` is the relevant excerpt from the reference paragraphs.
-- If you use multiple references, list them together (e.g., `[{{excerpt1}}][{{excerpt2}}]`).
-- If you cannot find sufficient information in the provided paragraphs, respond exactly: "No relevant information found in the provided paragraphs."
-
----
-
-**Reference Paragraphs:**
-{context}
----
-
-**User Question:**
-{question}
-
----
-
-**Answer Format Example:**
-Answer: {{your answer here}}
-References: [{{excerpt1}}][{{excerpt2}}]
-"""
-
+# ==================================================
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+NEO4J_URI = os.getenv("NEO4J_URI")
+NEO4J_USERNAME = os.getenv("NEO4J_USERNAME")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
 class PDFProcessor:
     def __init__(self):
@@ -79,7 +57,9 @@ class PDFProcessor:
                 blocks = page.get_text("blocks")
 
                 # Filter blocks within the content area
-                content_blocks = [block for block in blocks if block[1] >= top and block[3] <= bottom]
+                content_blocks = [
+                    block for block in blocks if block[1] >= top and block[3] <= bottom
+                ]
 
                 if not content_blocks:
                     continue
@@ -87,8 +67,12 @@ class PDFProcessor:
                 # Determine column layout by splitting at the page midpoint
                 x_coords = [block[0] for block in content_blocks]
                 mid_point = width / 2
-                left_blocks = [block for block in content_blocks if block[0] < mid_point]
-                right_blocks = [block for block in content_blocks if block[0] >= mid_point]
+                left_blocks = [
+                    block for block in content_blocks if block[0] < mid_point
+                ]
+                right_blocks = [
+                    block for block in content_blocks if block[0] >= mid_point
+                ]
 
                 if left_blocks and right_blocks:
                     # Two-column layout detected
@@ -110,20 +94,29 @@ class PDFProcessor:
                 full_text += page_text + "\n"
 
             doc.close()
-            logging.info(f"Extracted text from {pdf_path}, length: {len(full_text)} characters")
+            logging.info(
+                f"Extracted text from {pdf_path}, length: {len(full_text)} characters"
+            )
             return full_text.strip()
 
         except Exception as e:
             logging.error(f"Error extracting text from {pdf_path}: {e}")
             raise
 
+
 class TextSplitter:
-    def __init__(self, model_name="models/text-embedding-004", breakpoint_threshold_type="percentile"):
+    def __init__(
+        self,
+        model_name="models/text-embedding-004",
+        breakpoint_threshold_type="percentile",
+    ):
         self.splitter = SemanticChunker(
-            GoogleGenerativeAIEmbeddings(model=model_name, google_api_key=os.getenv("GEMINI_API_KEY")),   
-            breakpoint_threshold_type=breakpoint_threshold_type
+            GoogleGenerativeAIEmbeddings(
+                model=model_name, google_api_key=os.getenv("GEMINI_API_KEY")
+            ),
+            breakpoint_threshold_type=breakpoint_threshold_type,
         )
-    
+
     def split_text(self, text):
         chunks = self.splitter.split_text(text)
         print(f"Split text into {len(chunks)} chunks")
@@ -336,7 +329,9 @@ class Generator:
         """Generates an answer based on the question and retrieved chunks."""
         try:
             context = "\n".join(chunks)
-            prompt = PROMPT.format(question=question, context=clean_context(context))
+            prompt = QNA_PROMPT.format(
+                question=question, context=clean_context(context)
+            )
             answer = self.llm.invoke(prompt)
             logging.info(f"Generated answer for question: {question}")
             response = {}
@@ -419,30 +414,16 @@ class RAGSystem:
         self.db_connector.close()
 
 
-class QnaRequest(BaseModel):
-    question: str
-
-
-class PDFRequest(BaseModel):
-    pdf_path: str
-
-
-# ==================================================
-load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-NEO4J_URI = os.getenv("NEO4J_URI")
-NEO4J_USERNAME = os.getenv("NEO4J_USERNAME")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
 
 PDF_ID = None
 RAG_SYSTEM = RAGSystem()
 
 
-def read_pdf(request: PDFRequest):
+def read_pdf(pdf_path: str):
     """Reads a PDF file and processes it."""
     global PDF_ID
-    PDF_ID = RAG_SYSTEM.process_pdf(request.pdf_path)
+    PDF_ID = RAG_SYSTEM.process_pdf(pdf_path)
     return PDF_ID
 
 
@@ -457,13 +438,14 @@ def clear_pdf():
         logging.warning("No PDF data to clear")
 
 
-def qna(request: QnaRequest):
+def qna(question):
     """Answers a question based on the processed PDF."""
     if PDF_ID is None:
         raise ValueError("No PDF has been processed. Please upload a PDF first.")
-    return RAG_SYSTEM.answer_question(request.question, PDF_ID)
+    return RAG_SYSTEM.answer_question(question, PDF_ID)
 
 
+# Này để test th, import thì ko chạy đâu đừng lo
 if __name__ == "__main__":
     PDF_ID = None
     RAG_SYSTEM = RAGSystem()
@@ -473,11 +455,11 @@ if __name__ == "__main__":
     question = "What is YOLO's loss function?"
 
     # Read and process the PDF
-    pdf_id = read_pdf(PDFRequest(pdf_path=pdf_path))
+    pdf_id = read_pdf(pdf_path=pdf_path)
     print(f"Processed PDF ID: {pdf_id}")
 
     # Ask a question
-    answer = qna(QnaRequest(question=question))
+    answer = qna(question=question)
     print(f"Answer: {answer}")
 
     # Clear the processed PDF data

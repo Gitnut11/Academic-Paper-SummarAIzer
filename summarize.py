@@ -1,14 +1,16 @@
 import gc
 import logging
 
-import nltk
 import torch
 from peft import PeftModel
 from pydantic import BaseModel
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-nltk.download("punkt")
-nltk.download("punkt_tab")
+#======== Comment when using docker
+# import nltk
+# nltk.download("punkt")
+# nltk.download("punkt_tab")
+#========
 from nltk.tokenize import sent_tokenize
 
 BASE_MODEL = "allenai/led-base-16384"
@@ -136,16 +138,16 @@ class LEDInference:
         return final_summary
 
 
-class SmrRequest(BaseModel):
-    text: str
+# class SmrRequest(BaseModel):
+#     text: str
 
 
 LED = LEDInference()
 
 
-def summarize(request: SmrRequest):
+def summarize(text):
     try:
-        summary = LED.infer(request.text)
-        return {"summary": summary}
+        summary = LED.infer(text)
+        return summary
     except Exception as e:
         logging.error(f"Error during summarization: {e}")
