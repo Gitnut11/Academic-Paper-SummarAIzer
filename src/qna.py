@@ -118,7 +118,7 @@ class PDFProcessor:
             raise
 
 class TextSplitter:
-    def __init__(self, model_name="models/embedding-001", breakpoint_threshold_type="percentile"):
+    def __init__(self, model_name="models/text-embedding-004", breakpoint_threshold_type="percentile"):
         self.splitter = SemanticChunker(
             GoogleGenerativeAIEmbeddings(model=model_name, google_api_key=os.getenv("GEMINI_API_KEY")),   
             breakpoint_threshold_type=breakpoint_threshold_type
@@ -127,15 +127,13 @@ class TextSplitter:
     def split_text(self, text):
         chunks = self.splitter.split_text(text)
         print(f"Split text into {len(chunks)} chunks")
-        for item in chunks:
-            print(item, end="\n\n")
-        return 
+        return chunks
 
 
 class Embedder:
     """Generates embeddings using the Gemini embedding model via LangChain."""
 
-    def __init__(self, model_name="models/embedding-001"):
+    def __init__(self, model_name="models/text-embedding-004"):
         self.embeddings = GoogleGenerativeAIEmbeddings(
             model=model_name, google_api_key=GEMINI_API_KEY
         )
@@ -373,7 +371,7 @@ class RAGSystem:
     def __init__(self):
         self.pdf_processor = PDFProcessor()
         self.text_splitter = TextSplitter()
-        self.embedder = Embedder(model_name="models/embedding-001")
+        self.embedder = Embedder(model_name="models/text-embedding-004")
         self.db_connector = DatabaseConnector(
             uri=NEO4J_URI,
             user=NEO4J_USERNAME,
@@ -471,8 +469,8 @@ if __name__ == "__main__":
     RAG_SYSTEM = RAGSystem()
 
     # Example usage
-    pdf_path = "Diffset.pdf"  # Replace with your PDF file path
-    question = "Mục đích của hướng tiếp cận Diffset là gì?"
+    pdf_path = "pro.pdf"  # Replace with your PDF file path
+    question = "What is YOLO's loss function?"
 
     # Read and process the PDF
     pdf_id = read_pdf(PDFRequest(pdf_path=pdf_path))
@@ -480,7 +478,7 @@ if __name__ == "__main__":
 
     # Ask a question
     answer = qna(QnaRequest(question=question))
-    print(f"Answer: {answer['answer']}")
+    print(f"Answer: {answer}")
 
     # Clear the processed PDF data
     clear_pdf()

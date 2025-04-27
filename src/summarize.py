@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 nltk.download("punkt")
+nltk.download("punkt_tab")
 from nltk.tokenize import sent_tokenize
 
 BASE_MODEL = "allenai/led-base-16384"

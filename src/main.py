@@ -30,6 +30,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("shutdown")
+async def on_shutdown():
+    clear_pdf()
+
 @app.post("/smr")
 async def get_smr(request: SmrRequest):
     return summarize(request)
