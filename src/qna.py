@@ -3,10 +3,10 @@ import os
 import re
 import uuid
 
-import pdfplumber
+import fitz
 import spacy
 from dotenv import load_dotenv
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_experimental.text_splitter import SemanticChunker  
 
 # from langchain_experimental.text_splitter import SemanticChunker
 from langchain_google_genai import GoogleGenerativeAI, GoogleGenerativeAIEmbeddings
@@ -45,55 +45,91 @@ References: [{{excerpt1}}][{{excerpt2}}]
 
 
 class PDFProcessor:
-    """Handles PDF upload and text extraction for one-column and two-column layouts."""
+    def __init__(self):
+        # Set up basic logging
+        logging.basicConfig(level=logging.INFO)
 
-    def extract_text(self, pdf_path):
-        """Extracts text from a PDF file using pdfplumber with custom cropping."""
+    def extract_text(self, pdf_path, margin=0.1):
+        """
+        Extract text from a PDF, handling two-column layouts with PyMuPDF.
+
+        Args:
+            pdf_path (str): Path to the PDF file.
+            margin (float): Fraction of page height to exclude as top/bottom margins.
+
+        Returns:
+            str: Extracted text with left column followed by right column.
+        """
         try:
-            with pdfplumber.open(pdf_path) as pdf:
-                text = ""
-                for page in pdf.pages:
-                    # Get MediaBox dimensions
-                    media_box = page.mediabox
-                    width, height = (
-                        media_box[2] - media_box[0],
-                        media_box[3] - media_box[1],
-                    )
+            # Open the PDF document
+            doc = fitz.open(pdf_path)
+            full_text = ""
 
-                    # Define a custom CropBox (e.g., 10% margin removal from each side)
-                    margin = 0.1  # 10% margin
-                    crop_box = (
-                        media_box[0] + width * margin,  # left
-                        media_box[1] + height * margin,  # bottom
-                        media_box[2] - width * margin,  # right
-                        media_box[3] - height * margin,  # top
-                    )
+            # Process each page
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                height = page.rect.height
+                width = page.rect.width
 
-                    # Crop the page to focus on main content
-                    cropped_page = page.within_bbox(crop_box)
+                # Define content area (exclude top and bottom margins)
+                top = margin * height
+                bottom = (1 - margin) * height
 
-                    # Extract text with layout-aware settings
-                    text += cropped_page.extract_text(layout=True) + "\n"
+                # Get text blocks
+                blocks = page.get_text("blocks")
 
-                logging.info(
-                    f"Extracted text from {pdf_path}, length: {len(text)} characters"
-                )
-                return text
+                # Filter blocks within the content area
+                content_blocks = [block for block in blocks if block[1] >= top and block[3] <= bottom]
+
+                if not content_blocks:
+                    continue
+
+                # Determine column layout by splitting at the page midpoint
+                x_coords = [block[0] for block in content_blocks]
+                mid_point = width / 2
+                left_blocks = [block for block in content_blocks if block[0] < mid_point]
+                right_blocks = [block for block in content_blocks if block[0] >= mid_point]
+
+                if left_blocks and right_blocks:
+                    # Two-column layout detected
+                    # Sort blocks in each column by y-coordinate (top to bottom)
+                    left_blocks.sort(key=lambda b: b[1])
+                    right_blocks.sort(key=lambda b: b[1])
+
+                    # Extract text from left and right columns
+                    left_text = "\n".join([block[4] for block in left_blocks])
+                    right_text = "\n".join([block[4] for block in right_blocks])
+
+                    # Combine columns
+                    page_text = left_text + "\n" + right_text
+                else:
+                    # Single-column layout
+                    content_blocks.sort(key=lambda b: b[1])
+                    page_text = "\n".join([block[4] for block in content_blocks])
+
+                full_text += page_text + "\n"
+
+            doc.close()
+            logging.info(f"Extracted text from {pdf_path}, length: {len(full_text)} characters")
+            return full_text.strip()
+
         except Exception as e:
             logging.error(f"Error extracting text from {pdf_path}: {e}")
             raise
 
-
 class TextSplitter:
-    def __init__(self, chunk_size=1000, chunk_overlap=200):
-        self.splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size, chunk_overlap=chunk_overlap
+    def __init__(self, model_name="models/embedding-001", breakpoint_threshold_type="percentile"):
+        self.splitter = SemanticChunker(
+            GoogleGenerativeAIEmbeddings(model=model_name, google_api_key=os.getenv("GEMINI_API_KEY")),   
+            breakpoint_threshold_type=breakpoint_threshold_type
         )
-
+    
     def split_text(self, text):
         chunks = self.splitter.split_text(text)
-        logging.info(f"Split text into {len(chunks)} chunks")
-        return chunks
+        print(f"Split text into {len(chunks)} chunks")
+        for item in chunks:
+            print(item, end="\n\n")
+        return 
 
 
 class Embedder:
