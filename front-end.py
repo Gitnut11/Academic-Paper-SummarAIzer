@@ -53,7 +53,6 @@ def login_page():
                 response = requests.post(API_URL + "register", data=data)
                 if response.status_code == 200:
                     res = response.json()
-                    st.success()
                     set_response(res['message'], True)
                 else:
                     set_response("Username already exists", False)
@@ -88,7 +87,7 @@ def sidebar():
     # pop up when click upload button
     @st.dialog("Upload your file")
     def upload_dialog():
-        uploaded_file = st.file_uploader(
+        uploaded_file = st.file_uploader(label='tmp',
             type="pdf", accept_multiple_files=False, label_visibility="collapsed")
         if uploaded_file:
             with st.spinner("Uploading to server..."):
@@ -134,6 +133,15 @@ def sidebar():
     if len(st.session_state.file_list) != 0:
         for idx, file in enumerate(st.session_state.file_list):
             if st.sidebar.button("📁 " + file['name'], use_container_width=True, key=f"{idx}"):
+                # prepare RAG 
+                with st.spinner("Clearing last file..."):
+                    response = requests.get(API_URL + "pdf-clear")
+                with st.spinner("Changing file..."):
+                    response = requests.get(API_URL + f"pdf-update/{st.session_state.selected_file["id"]}")
+                    if response.status_code != 200:
+                        st.error("Error selecting pdf file for RAG:'(")
+                        continue
+                        
                 # delete last file
                 if st.session_state.selected_file is not None and "binary" in st.session_state.selected_file:
                     del st.session_state.selected_file["binary"]

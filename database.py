@@ -95,7 +95,7 @@ class Database:
                 WHERE file_path = ?
             ''', (rand_path,))
             if not self.cursor.fetchone():
-                return rand_str
+                return rand_str + '.pdf'
 
     # insert to files table
     def insert_user_file(self, user_id, file_path, display_name):
@@ -120,7 +120,7 @@ class Database:
         save_path = os.path.join(self.file_dir, saved_file_name)
         with open(save_path, 'wb') as f:
             f.write(file_binary)
-        self.insert_user_file(user_id, os.path.abspath(save_path), file_name)
+        self.insert_user_file(user_id, save_path, file_name)
 
     # return all files of a user
     def get_user_files(self, user_id):
