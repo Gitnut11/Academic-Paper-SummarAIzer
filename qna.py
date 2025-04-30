@@ -398,17 +398,15 @@ def current_pdf():
 
 def read_pdf(pdf_path: str):
     """Reads a PDF file and processes it."""
-    global PDF_ID
-    PDF_ID = RAG_SYSTEM.process_pdf(pdf_path)
-    return PDF_ID
+    # global PDF_ID
+    pdf_id = RAG_SYSTEM.process_pdf(pdf_path)
+    return pdf_id
 
 
-def clear_pdf():
+def clear_pdf(pdf_id: str):
     """Clears the processed PDF data."""
-    global PDF_ID
-    if PDF_ID is not None:
-        RAG_SYSTEM.db_connector.delete_pdf_graph(PDF_ID)
-        PDF_ID = None
+    if pdf_id is not None:
+        RAG_SYSTEM.db_connector.delete_pdf_graph(pdf_id)
         logging.info("Cleared processed PDF data")
         return True
     else:
@@ -416,11 +414,11 @@ def clear_pdf():
         return False
 
 
-def qna(question):
+def qna(question: str, pdf_id: str):
     """Answers a question based on the processed PDF."""
-    if PDF_ID is None:
+    if pdf_id is None:
         raise ValueError("No PDF has been processed. Please upload a PDF first.")
-    return RAG_SYSTEM.answer_question(question, PDF_ID)
+    return RAG_SYSTEM.answer_question(question, pdf_id)
 
 
 # Này để test th, import thì ko chạy đâu đừng lo
