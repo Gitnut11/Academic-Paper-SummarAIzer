@@ -3,6 +3,8 @@ import os
 import hashlib
 import random
 import string
+from summarize import summarize
+from qna import PDFProcessor
 
 class Database:
     def __init__(self, database='database.db', dir="./file"):
@@ -11,6 +13,7 @@ class Database:
         self.cursor.execute("PRAGMA foreign_keys = ON;")
         self.create_users_table()
         self.create_files_table()
+        self.pdf_extract = PDFProcessor()
         self.file_dir = dir
         if not os.path.exists(self.file_dir):
             os.makedirs(self.file_dir)
@@ -77,6 +80,7 @@ class Database:
                 user_id TEXT NOT NULL,
                 file_path TEXT NOT NULL,
                 display_name TEXT NOT NULL,
+                summarize TEXT NOT NULL,
                 FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
             )
         ''')
@@ -98,15 +102,15 @@ class Database:
                 return rand_str + '.pdf'
 
     # insert to files table
-    def insert_user_file(self, user_id, file_path, display_name):
+    def insert_user_file(self, user_id, file_path, display_name, summarize):
         if not os.path.isfile(file_path):
             print(f"[ERROR] File '{file_path}' does not exist or is not a file")
             return
         if display_name is None:
             display_name = os.path.basename(file_path)
         self.cursor.execute('''
-            INSERT INTO files (user_id, file_path, display_name) VALUES (?, ?, ?)
-        ''', (user_id, file_path, display_name))
+            INSERT INTO files (user_id, file_path, display_name, summarize) VALUES (?, ?, ?, ?)
+        ''', (user_id, file_path, display_name, summarize))
         self.connect.commit()
         print(f"[INFO] Inserted file '{display_name}' to user with id: '{user_id}' successfully.")
 
@@ -120,7 +124,8 @@ class Database:
         save_path = os.path.join(self.file_dir, saved_file_name)
         with open(save_path, 'wb') as f:
             f.write(file_binary)
-        self.insert_user_file(user_id, save_path, file_name)
+        smr = summarize(self.pdf_extract.extract_text(save_path))
+        self.insert_user_file(user_id, save_path, file_name, smr)
 
     # return all files of a user
     def get_user_files(self, user_id):
@@ -140,6 +145,18 @@ class Database:
         result = self.cursor.fetchone()
         if result:
             print(f"[INFO] Retrieved file with id: {id}")
+            return result
+        else:
+            return None
+
+    def get_smr_by_id(self, id):
+        self.cursor.execute('''
+            SELECT summarize from files
+            WHERE id = ?
+        ''', (id,))
+        result = self.cursor.fetchone()
+        if result:
+            print(f"[INFO] Retrieved summary with id: {id}")
             return result
         else:
             return None

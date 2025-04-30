@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
 import base64
+from streamlit_extras.stylable_container import stylable_container
+
 
 API_URL = "http://localhost:8000/"
 
@@ -16,7 +18,8 @@ def preset_states():
         st.session_state.login_form_response = ["", False]
     if "messages" not in st.session_state:
         st.session_state.messages = []
-
+    if "summary" not in st.session_state:
+        st.session_state.summary = None
 
 def set_response(response: str, status: bool):
     st.session_state.login_form_response[0] = response
@@ -98,80 +101,13 @@ def sidebar():
                     API_URL + "upload", data=data, files=files)
                 st.session_state.file_list = response.json()
                 st.rerun()
-    # upload button
-    if st.sidebar.button("Upload", use_container_width=True, type="primary"):
-        upload_dialog()
 
-    # style uploaded files on sidebar
-    st.markdown("""
-        <style>
-        section[data-testid="stSidebar"] [data-testid=stVerticalBlock]{
-            gap: 0rem;
-        }
-        section[data-testid="stSidebar"] button[kind="secondary"] {
-            background-color: #f1f2f4;
-            color: #202123;
-            border: none;
-            border-radius: 0%;
-            text-align: left;
-            transition: all 0.2s ease-in-out;
-            font-size: 0.9rem;
-            text-align: left;
-            justify-content: flex-start;
-            display: flex;
-        }
-        section[data-testid="stSidebar"] button[kind="secondary"]:hover {
-            background-color: #e0e0e0;
-            color: #000;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-# ------------------------------ choose another file
-    # file list, each is a button to navigate to the corresponding file 
-    st.sidebar.subheader("Your file list")
-    if len(st.session_state.file_list) != 0:
-        for idx, file in enumerate(st.session_state.file_list):
-            if st.sidebar.button("📁 " + file['name'], use_container_width=True, key=f"{idx}"):
-                # prepare RAG 
-                with st.spinner("Clearing last file..."):
-                    response = requests.get(API_URL + "pdf-clear")
-                with st.spinner("Changing file..."):
-                    response = requests.get(API_URL + f"pdf-update/{st.session_state.selected_file["id"]}")
-                    if response.status_code != 200:
-                        st.error("Error selecting pdf file for RAG:'(")
-                        continue
-                        
-                # delete last file
-                if st.session_state.selected_file is not None and "binary" in st.session_state.selected_file:
-                    del st.session_state.selected_file["binary"]
-                # select new file
-                st.session_state.selected_file = file
-                # get chat history
-                with st.spinner("Retrieving chat history..."):
-                    response = requests.get(API_URL + f"chat/{file["id"]}")
-                    if response.status_code == 200:
-                        history = response.json()
-                        st.session_state.messages = history["history"]
-                        st.rerun()
-                    else:
-                        st.error("Something went wrong D:")
-    else:
-        st.sidebar.caption("empty...")
-
-
-@st.cache_data
-def displayPDF(file):
-    base64_pdf = base64.b64encode(file).decode('utf-8')
-    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500" type="application/pdf"></iframe>'
-    return pdf_display
-
-# ------------------------------------------- chat bot
-
-
-def chat_page():
-    @st.dialog(st.session_state.selected_file["name"], width="large")
+    # open file
+    @st.dialog("View PDF", width="large")
     def view_file():
+        if st.session_state.selected_file is None:
+            st.write("Please select a file")
+            return
         if "binary" not in st.session_state.selected_file:
             with st.spinner("Requesting file..."):
                 response = requests.get(
@@ -184,17 +120,113 @@ def chat_page():
             pdf_display = displayPDF(st.session_state.selected_file["binary"])
             st.markdown(pdf_display, unsafe_allow_html=True)
 
-    # button to open file
-    if st.button("📝 Review file", use_container_width=True):
-        view_file()
+    # upload button
+    if st.sidebar.button("Upload", use_container_width=True, type="primary"):
+        upload_dialog()
+    with st.sidebar:
+        tab1, tab2 = st.tabs(["📁 File selection", "📝 Current file"])
+        with tab1:
+            # style uploaded files on sidebar
+            st.markdown("""
+                <style>
+                section[data-testid="stSidebar"] [data-testid=stVerticalBlock]{
+                    gap: 0rem;
+                }
+                section[data-testid="stSidebar"] button[kind="secondary"]:hover {
+                    background-color: #e0e0e0;
+                    color: #000;
+                }
+                </style>
+            """, unsafe_allow_html=True)
 
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+        # ------------------------------ choose another file
+            # file list, each is a button to navigate to the corresponding file 
+            st.subheader("Your file list")
+            if len(st.session_state.file_list) != 0:
+                for idx, file in enumerate(st.session_state.file_list):
+                    with stylable_container(key=f"{file["id"]}",css_styles='''
+                        button {
+                            background-color: #f1f2f4;
+                            color: #202123;
+                            border: none;
+                            border-radius: 0%;
+                            white-space: nowrap;
+                            text-overflow: ellipsis;
+                            overflow: hidde;
+                            text-align: left;
+                            transition: all 0.2s ease-in-out;
+                            font-size: 0.9rem;
+                            text-align: left;
+                            justify-content: flex-start;
+                            display: flex;     
+                            max-width: 100%;      
+                        }
+                    '''):
+                        if st.button("📄 " + file['name'], use_container_width=True, key=f"{idx}"):
+                            # prepare RAG 
+                            with st.spinner("Clearing last file..."):
+                                response = requests.get(API_URL + "pdf-clear")
+                            with st.spinner("Changing file..."):
+                                response = requests.get(API_URL + f"pdf-update/{file["id"]}")
+                                if response.status_code != 200:
+                                    st.error("Error selecting pdf file for RAG:'(")
+                                    continue
+                            with st.spinner("Getting summary..."):
+                                try:
+                                    response = requests.get(API_URL + f"smr/{file["id"]}")
+                                    if response.status_code == 200:
+                                        st.session_state.summary = response.json()["summary"]
+                                    else:
+                                        st.error("Error getting summary :<")
+                                except Exception:
+                                        st.error("Error getting summary :<")
+                            # delete last file
+                            if st.session_state.selected_file is not None and "binary" in st.session_state.selected_file:
+                                del st.session_state.selected_file["binary"]
+                            # select new file
+                            st.session_state.selected_file = file
+                            # get chat history
+                            with st.spinner("Retrieving chat history..."):
+                                try:
+                                    response = requests.get(API_URL + f"chat/{file["id"]}")
+                                    if response.status_code == 200:
+                                        history = response.json()
+                                        st.session_state.messages = history["history"]
+                                        st.rerun()
+                                    else:
+                                        st.error("Something went wrong D:")
+                                except Exception:
+                                    st.error("Something went wrong D:")
+            else:
+                st.caption("empty...")
+        
+        with tab2:
+            if st.session_state.selected_file is not None:
+                if st.button("Open file", key="review", use_container_width=True):
+                    view_file()
+                st.subheader("Summarize")
+                with st.container(height=400):
+                    st.write(st.session_state.summary)        
+                st.subheader("FAQ")
+            else:
+                st.write("select a file first...")
+
+@st.cache_data
+def displayPDF(file):
+    base64_pdf = base64.b64encode(file).decode('utf-8')
+    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500" type="application/pdf"></iframe>'
+    return pdf_display
+
+# ------------------------------------------- chat bot
+
+
+def chat_page():
+    with st.container(height=780):
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
     if prompt := st.chat_input("Ask something..."):
-        st.chat_message("user").markdown(prompt)
-        
         # get response from server
         st.session_state.messages.append({"role": "user", "content": prompt})
         data = {
@@ -206,9 +238,8 @@ def chat_page():
                 response = requests.post(API_URL + "chatbot", data=data)
                 if response.status_code == 200:
                     reply = response.json()
-                    with st.chat_message("assistant"):
-                        st.markdown(reply["response"])
                     st.session_state.messages.append({"role": "assistant", "content": reply["response"]})
+                    st.rerun()
                 else:
                     st.error("Something went wrong :(")
             except Exception as e:
@@ -226,10 +257,13 @@ if __name__ == "__main__":
         st.markdown("""
         <style>
                .block-container {
-                    padding-top: 2rem;
+                    padding-top: 3rem;
                     padding-bottom: 1rem;
                     padding-left: 5rem;
                     padding-right: 5rem;
+                }
+                section[data-testid="stSidebar"] {
+                   width: 30% !important; # Set the width to your desired value
                 }
         </style>
         """, unsafe_allow_html=True)

@@ -5,7 +5,7 @@ import os
 from database import Database
 from qna import read_pdf, clear_pdf, qna, current_pdf, PDFProcessor
 from summarize import summarize
-from pdf_utils import get_sections, convert_to_markdown
+from pdf_utils import get_sections
 
 app = FastAPI()
 
@@ -81,7 +81,7 @@ async def chat(file_id: int):
 
 
 @app.post("/chatbot")
-def chatbot(prompt: str = Form(...), file_id: int = Form(...)):
+async def chatbot(prompt: str = Form(...), file_id: int = Form(...)):
     db = Database()
     try:
         db.log_chat(file_id, prompt, role="user")
@@ -116,6 +116,17 @@ def chatbot(prompt: str = Form(...), file_id: int = Form(...)):
         db.close()
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
+@app.get("/smr/{file_id}")
+async def smr(file_id: int):
+    db = Database()
+    try:
+        text = db.get_smr_by_id(file_id)[0]
+        db.close()
+        return JSONResponse(content={"summary": text})
+    except Exception as e:
+        db.close()
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+    
 @app.get("/pdf-update/{file_id}")
 async def load_pdf(file_id):
     db = Database()
