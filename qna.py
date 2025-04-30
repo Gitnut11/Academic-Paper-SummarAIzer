@@ -3,7 +3,7 @@ import os
 import re
 import uuid
 
-import fitz
+import pymupdf4llm  # Replaced fitz with pymupdf4llm
 import spacy
 from dotenv import load_dotenv
 from langchain_experimental.text_splitter import SemanticChunker
@@ -27,78 +27,20 @@ class PDFProcessor:
         # Set up basic logging
         logging.basicConfig(level=logging.INFO)
 
-    def extract_text(self, pdf_path, margin=0.1):
+    def extract_text(self, pdf_path):
         """
-        Extract text from a PDF, handling two-column layouts with PyMuPDF.
+        Extract Markdown text from a PDF using pymupdf4llm.
 
         Args:
             pdf_path (str): Path to the PDF file.
-            margin (float): Fraction of page height to exclude as top/bottom margins.
 
         Returns:
-            str: Extracted text with left column followed by right column.
+            str: Extracted Markdown text.
         """
         try:
-            # Open the PDF document
-            doc = fitz.open(pdf_path)
-            full_text = ""
-
-            # Process each page
-            for page_num in range(len(doc)):
-                page = doc[page_num]
-                height = page.rect.height
-                width = page.rect.width
-
-                # Define content area (exclude top and bottom margins)
-                top = margin * height
-                bottom = (1 - margin) * height
-
-                # Get text blocks
-                blocks = page.get_text("blocks")
-
-                # Filter blocks within the content area
-                content_blocks = [
-                    block for block in blocks if block[1] >= top and block[3] <= bottom
-                ]
-
-                if not content_blocks:
-                    continue
-
-                # Determine column layout by splitting at the page midpoint
-                x_coords = [block[0] for block in content_blocks]
-                mid_point = width / 2
-                left_blocks = [
-                    block for block in content_blocks if block[0] < mid_point
-                ]
-                right_blocks = [
-                    block for block in content_blocks if block[0] >= mid_point
-                ]
-
-                if left_blocks and right_blocks:
-                    # Two-column layout detected
-                    # Sort blocks in each column by y-coordinate (top to bottom)
-                    left_blocks.sort(key=lambda b: b[1])
-                    right_blocks.sort(key=lambda b: b[1])
-
-                    # Extract text from left and right columns
-                    left_text = "\n".join([block[4] for block in left_blocks])
-                    right_text = "\n".join([block[4] for block in right_blocks])
-
-                    # Combine columns
-                    page_text = left_text + "\n" + right_text
-                else:
-                    # Single-column layout
-                    content_blocks.sort(key=lambda b: b[1])
-                    page_text = "\n".join([block[4] for block in content_blocks])
-
-                full_text += page_text + "\n"
-
-            doc.close()
-            logging.info(
-                f"Extracted text from {pdf_path}, length: {len(full_text)} characters"
-            )
-            return full_text.strip()
-
+            markdown_text = pymupdf4llm.to_markdown(pdf_path)
+            logging.info(f"Extracted Markdown text from {pdf_path}, length: {len(markdown_text)} characters")
+            return markdown_text.strip()
         except Exception as e:
             logging.error(f"Error extracting text from {pdf_path}: {e}")
             raise
@@ -117,8 +59,39 @@ class TextSplitter:
             breakpoint_threshold_type=breakpoint_threshold_type,
         )
 
-    def split_text(self, text):
-        chunks = self.splitter.split_text(text)
+    def split_text(self, markdown_text):
+        """
+        Splits the Markdown text into sections based on '## ' headings,
+        then applies SemanticChunker to each section to get chunks.
+
+        Args:
+            markdown_text (str): The Markdown text extracted from the PDF.
+
+        Returns:
+            list: List of text chunks.
+        """
+        sections = []
+        current_section = []
+        
+        for line in markdown_text.splitlines():
+            if line.startswith("## "):
+                if current_section:
+                    sections.append("\n".join(current_section))
+                    current_section = [line]
+                else:
+                    current_section.append(line)
+            else:
+                current_section.append(line)
+        
+        if current_section:
+            sections.append("\n".join(current_section))
+        
+        # Split each section using SemanticChunker
+        chunks = []
+        for section in sections:
+            section_chunks = self.splitter.split_text(section)
+            chunks.extend(section_chunks)
+        
         print(f"Split text into {len(chunks)} chunks")
         return chunks
 
