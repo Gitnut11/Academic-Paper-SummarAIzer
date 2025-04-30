@@ -4,7 +4,8 @@ import hashlib
 import random
 import string
 from summarize import summarize
-from qna import PDFProcessor
+from pdf_utils import get_pdf_page_count
+from qna import PDFProcessor, read_pdf
 
 class Database:
     def __init__(self, database='database.db', dir="./file"):
@@ -76,11 +77,12 @@ class Database:
     def create_files_table(self):
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS files (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
                 file_path TEXT NOT NULL,
                 display_name TEXT NOT NULL,
                 summarize TEXT NOT NULL,
+                num INTEGER NOT NULL,
                 FOREIGN KEY(user_id) REFERENCES users(user_id) ON DELETE CASCADE
             )
         ''')
@@ -102,21 +104,18 @@ class Database:
                 return rand_str + '.pdf'
 
     # insert to files table
-    def insert_user_file(self, user_id, file_path, display_name, summarize):
+    def insert_user_file(self, file_id, user_id, file_path, display_name, summarize, page_num):
         if not os.path.isfile(file_path):
             print(f"[ERROR] File '{file_path}' does not exist or is not a file")
             return
         if display_name is None:
             display_name = os.path.basename(file_path)
         self.cursor.execute('''
-            INSERT INTO files (user_id, file_path, display_name, summarize) VALUES (?, ?, ?, ?)
-        ''', (user_id, file_path, display_name, summarize))
+            INSERT INTO files (id, user_id, file_path, display_name, summarize, num) VALUES (?, ?, ?, ?, ?, ?)
+        ''', (file_id, user_id, file_path, display_name, summarize, page_num))
         self.connect.commit()
         print(f"[INFO] Inserted file '{display_name}' to user with id: '{user_id}' successfully.")
-
-        # create chatlog to the new file
-        last_row_id = self.cursor.lastrowid
-        self.create_chatlog_table(str(last_row_id))
+        self.create_chatlog_table(file_id)
     
     # insert a file in binary to the table
     def insert_user_file_binary(self, user_id, file_binary, file_name):
@@ -125,16 +124,19 @@ class Database:
         with open(save_path, 'wb') as f:
             f.write(file_binary)
         smr = summarize(self.pdf_extract.extract_text(save_path))
-        self.insert_user_file(user_id, save_path, file_name, smr)
+        file_id = read_pdf(save_path)
+        page_num = get_pdf_page_count(save_path)
+        self.insert_user_file(file_id, user_id, save_path, file_name, smr, page_num)
+        return save_path
 
     # return all files of a user
     def get_user_files(self, user_id):
         self.cursor.execute('''
-            SELECT id, display_name FROM files
+            SELECT id, display_name, num FROM files
             WHERE user_id = ?
         ''', (user_id,))
         result = self.cursor.fetchall()
-        return [{"id": file_id, "name": file_name} for (file_id, file_name) in result]
+        return [{"id": file_id, "name": file_name, "num": page_num} for (file_id, file_name, page_num) in result]
     
     # get file with id
     def get_file_by_id(self, id):
@@ -163,7 +165,8 @@ class Database:
 
     # create chatlog for new file
     def create_chatlog_table(self, file_id):
-        table_name = "chatlog_" + file_id
+        table_name = "chat_" + hashlib.sha256(file_id.encode()).hexdigest()
+        print(table_name)
         self.cursor.execute(f'''
             CREATE TABLE {table_name} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,7 +179,7 @@ class Database:
 
     # get chat history
     def get_history(self, file_id):
-        table_name = "chatlog_" + str(file_id)
+        table_name = "chat_" + hashlib.sha256(file_id.encode()).hexdigest()
         self.cursor.execute(f'''
             SELECT role, text
             FROM (
@@ -194,7 +197,7 @@ class Database:
     
     # save chat message
     def log_chat(self, id, text, role):
-        table_name = "chatlog_" + str(id)
+        table_name = "chat_" + hashlib.sha256(id.encode()).hexdigest()
         self.cursor.execute(f'''
             INSERT INTO {table_name} (role, text) VALUES ('{role}', '{text}')
         ''')

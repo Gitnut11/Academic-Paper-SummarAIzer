@@ -20,6 +20,8 @@ def preset_states():
         st.session_state.messages = []
     if "summary" not in st.session_state:
         st.session_state.summary = None
+    if "page_num" not in st.session_state:
+        st.session_state.page_num = 1
 
 def set_response(response: str, status: bool):
     st.session_state.login_form_response[0] = response
@@ -108,17 +110,31 @@ def sidebar():
         if st.session_state.selected_file is None:
             st.write("Please select a file")
             return
-        if "binary" not in st.session_state.selected_file:
+        col1, col2, col3 = st.columns([1, 3, 1])
+        num = st.session_state.page_num
+        with col1:
+            if st.button("<", use_container_width=True, disabled=num == 1) and num > 1:
+                num -= 1
+        with col3:
+            if st.button("\>", use_container_width=True, disabled=num == st.session_state.selected_file["num"]) and num < st.session_state.selected_file["num"]:
+                num += 1
+        with col2:
+            st.markdown(f"<div style='text-align:center; font-size: 18px;'>Page {num} / {st.session_state.selected_file["num"]}</div>", unsafe_allow_html=True)
+
+        # num = st.number_input("page number:", min_value=1, max_value=st.session_state.selected_file["num"], value= step=1)
+        if num != st.session_state.page_num or "binary" not in st.session_state.selected_file:
+            st.session_state.page_num = num
             with st.spinner("Requesting file..."):
                 response = requests.get(
-                    API_URL + f"pdf/{str(st.session_state.selected_file["id"])}")
+                    API_URL + f"pdf/{st.session_state.selected_file["id"]}/{st.session_state.page_num}")
                 if response.status_code == 200:
                     st.session_state.selected_file["binary"] = response.content
                 else:
                     st.error("error")
-        if "binary" in st.session_state.selected_file:
-            pdf_display = displayPDF(st.session_state.selected_file["binary"])
-            st.markdown(pdf_display, unsafe_allow_html=True)
+            st.rerun(scope="fragment")
+        pdf_display = displayPDF(st.session_state.selected_file["binary"])
+        st.markdown(pdf_display, unsafe_allow_html=True)
+            
 
     # upload button
     if st.sidebar.button("Upload", use_container_width=True, type="primary"):
@@ -163,14 +179,6 @@ def sidebar():
                         }
                     '''):
                         if st.button("📄 " + file['name'], use_container_width=True, key=f"{idx}"):
-                            # prepare RAG 
-                            with st.spinner("Clearing last file..."):
-                                response = requests.get(API_URL + "pdf-clear")
-                            with st.spinner("Changing file..."):
-                                response = requests.get(API_URL + f"pdf-update/{file["id"]}")
-                                if response.status_code != 200:
-                                    st.error("Error selecting pdf file for RAG:'(")
-                                    continue
                             with st.spinner("Getting summary..."):
                                 try:
                                     response = requests.get(API_URL + f"smr/{file["id"]}")
@@ -185,6 +193,8 @@ def sidebar():
                                 del st.session_state.selected_file["binary"]
                             # select new file
                             st.session_state.selected_file = file
+                            # reset view page
+                            st.session_state.page_num = 1
                             # get chat history
                             with st.spinner("Retrieving chat history..."):
                                 try:
@@ -205,7 +215,7 @@ def sidebar():
                 if st.button("Open file", key="review", use_container_width=True):
                     view_file()
                 st.subheader("Summarize")
-                with st.container(height=400):
+                with st.container(height=200):
                     st.write(st.session_state.summary)        
                 st.subheader("FAQ")
             else:
@@ -214,14 +224,14 @@ def sidebar():
 @st.cache_data
 def displayPDF(file):
     base64_pdf = base64.b64encode(file).decode('utf-8')
-    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500" type="application/pdf"></iframe>'
+    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="900" type="application/pdf"></iframe>'
     return pdf_display
 
 # ------------------------------------------- chat bot
 
 
 def chat_page():
-    with st.container(height=780):
+    with st.container(height=720):
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])

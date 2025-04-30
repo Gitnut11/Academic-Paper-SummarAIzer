@@ -392,10 +392,6 @@ class RAGSystem:
 PDF_ID = None
 RAG_SYSTEM = RAGSystem()
 
-def current_pdf():
-    global PDF_ID
-    return PDF_ID
-
 def read_pdf(pdf_path: str):
     """Reads a PDF file and processes it."""
     # global PDF_ID

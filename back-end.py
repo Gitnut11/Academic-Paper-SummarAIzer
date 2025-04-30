@@ -1,21 +1,24 @@
 from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from database import Database
-from qna import read_pdf, clear_pdf, qna, current_pdf, PDFProcessor
+from qna import qna, PDFProcessor
 from summarize import summarize
 from pdf_utils import get_sections
+from pdf_utils import extract_page_as_binary
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins (for development; restrict in production)
+    # Allow all origins (for development; restrict in production)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.post("/register")
 async def register(username: str = Form(...), password: str = Form(...)):
@@ -46,6 +49,7 @@ async def upload_file(user_id: str = Form(...), file: UploadFile = File(...)):
         file_binary = file.file.read()
         db.insert_user_file_binary(user_id, file_binary, file.filename)
         file_list = db.get_user_files(user_id)
+        print(file_list)
         db.close()
         return file_list
     except Exception as e:
@@ -53,22 +57,23 @@ async def upload_file(user_id: str = Form(...), file: UploadFile = File(...)):
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
-@app.get("/pdf/{id}")
-async def pdf(id: int):
+@app.get("/pdf/{id}/{num}")
+async def pdf(id: str, num: int):
     db = Database()
     try:
         file_path, file_name = db.get_file_by_id(id)
+        if not os.path.exists(file_path):
+            return JSONResponse(content={"error": "File not found"}, status_code=400)
+        binary = extract_page_as_binary(file_path, num)
         db.close()
-        if os.path.exists(file_path):
-            return FileResponse(path=file_path, filename=file_name + ".pdf", media_type="application/pdf")
-        return JSONResponse(content={"error": "File not found"}, status_code=400)
+        return Response(content=binary, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={file_name}_{num}.pdf"})
     except Exception as e:
         db.close()
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
 @app.get("/chat/{file_id}")
-async def chat(file_id: int):
+async def chat(file_id: str):
     db = Database()
     try:
         chat_history = db.get_history(file_id)
@@ -79,9 +84,8 @@ async def chat(file_id: int):
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
-
 @app.post("/chatbot")
-async def chatbot(prompt: str = Form(...), file_id: int = Form(...)):
+async def chatbot(prompt: str = Form(...), file_id: str = Form(...)):
     db = Database()
     try:
         db.log_chat(file_id, prompt, role="user")
@@ -109,15 +113,16 @@ async def chatbot(prompt: str = Form(...), file_id: int = Form(...)):
                 Unknown command detected, use `/help` for some instruction
             '''
         else:
-            reply = qna(prompt)["answer"]
+            reply = qna(prompt, file_id)["answer"]
         db.log_chat(file_id, reply, role="assistant")
         return {"response": reply}
     except Exception as e:
         db.close()
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
+
 @app.get("/smr/{file_id}")
-async def smr(file_id: int):
+async def smr(file_id: str):
     db = Database()
     try:
         text = db.get_smr_by_id(file_id)[0]
@@ -126,26 +131,13 @@ async def smr(file_id: int):
     except Exception as e:
         db.close()
         return JSONResponse(content={"error": str(e)}, status_code=500)
-    
-@app.get("/pdf-update/{file_id}")
-async def load_pdf(file_id):
-    db = Database()
-    last = current_pdf()
-    file = db.get_file_by_id(file_id)
-    if file is None:
-        return JSONResponse(content={"error": "File not found or deleted"}, status_code=400)
-    file_path = file[0]
-    result = read_pdf(file_path)
-    if last != result:
-        return JSONResponse(content={"success": "Chosen new pdf"})
-    return JSONResponse(content={"error": "Internal error"}, status_code=500)
 
-@app.get("/pdf-clear")
-async def remove_pdf():
-    if clear_pdf():
-        return JSONResponse(content={"success": "file cleared"})
-    return JSONResponse(content={"status": "No file to be cleared"}, status_code=200)
 
+# @app.get("/pdf-clear")
+# async def remove_pdf():
+#     if clear_pdf():
+#         return JSONResponse(content={"success": "file cleared"})
+#     return JSONResponse(content={"status": "No file to be cleared"}, status_code=200)
 
 
 if __name__ == "__main__":
