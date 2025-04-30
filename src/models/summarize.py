@@ -1,16 +1,15 @@
 import gc
 import logging
 
+# ======== Comment when using docker
+import nltk
 import torch
 from peft import PeftModel
-from pydantic import BaseModel
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-#======== Comment when using docker
-# import nltk
-# nltk.download("punkt")
-# nltk.download("punkt_tab")
-#========
+nltk.download("punkt")
+nltk.download("punkt_tab")
+# ========
 from nltk.tokenize import sent_tokenize
 
 BASE_MODEL = "allenai/led-base-16384"
@@ -18,7 +17,7 @@ REPO_NAME = "Mels22/led-scisummnet"
 
 CHUNK_SIZE = 8192
 OVERLAP_SIZE = 512
-MAX_TARGET_LENGTH = 512
+MAX_TARGET_LENGTH = 1024
 
 
 class LEDInference:
@@ -90,7 +89,9 @@ class LEDInference:
                 return_tensors="pt",
             ).to(self.device)
 
-            global_attention_mask = torch.zeros_like(inputs["attention_mask"]).to(self.device)
+            global_attention_mask = torch.zeros_like(inputs["attention_mask"]).to(
+                self.device
+            )
             global_attention_mask[:, 0] = 1
 
             with torch.no_grad():
@@ -107,7 +108,9 @@ class LEDInference:
                     early_stopping=True,
                 )
 
-            batch_summaries = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            batch_summaries = self.tokenizer.batch_decode(
+                outputs, skip_special_tokens=True
+            )
             summaries.extend([s.strip() for s in batch_summaries])
 
             del inputs, global_attention_mask, outputs
@@ -138,10 +141,6 @@ class LEDInference:
         return final_summary
 
 
-# class SmrRequest(BaseModel):
-#     text: str
-
-
 LED = LEDInference()
 
 
@@ -151,3 +150,4 @@ def summarize(text):
         return summary
     except Exception as e:
         logging.error(f"Error during summarization: {e}")
+        return None

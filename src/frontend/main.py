@@ -116,17 +116,17 @@ def sidebar():
             if st.button("<", use_container_width=True, disabled=num == 1) and num > 1:
                 num -= 1
         with col3:
-            if st.button("\>", use_container_width=True, disabled=num == st.session_state.selected_file["num"]) and num < st.session_state.selected_file["num"]:
+            if st.button("\>", use_container_width=True, disabled=num == st.session_state.selected_file[num]) and num < st.session_state.selected_file[num]:
                 num += 1
         with col2:
-            st.markdown(f"<div style='text-align:center; font-size: 18px;'>Page {num} / {st.session_state.selected_file["num"]}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center; font-size: 18px;'>Page {num} / {st.session_state.selected_file[num]}</div>", unsafe_allow_html=True)
 
         # num = st.number_input("page number:", min_value=1, max_value=st.session_state.selected_file["num"], value= step=1)
         if num != st.session_state.page_num or "binary" not in st.session_state.selected_file:
             st.session_state.page_num = num
             with st.spinner("Requesting file..."):
                 response = requests.get(
-                    API_URL + f"pdf/{st.session_state.selected_file["id"]}/{st.session_state.page_num}")
+                    API_URL + f"pdf/{st.session_state.selected_file[id]}/{st.session_state.page_num}")
                 if response.status_code == 200:
                     st.session_state.selected_file["binary"] = response.content
                 else:
@@ -160,7 +160,7 @@ def sidebar():
             st.subheader("Your file list")
             if len(st.session_state.file_list) != 0:
                 for idx, file in enumerate(st.session_state.file_list):
-                    with stylable_container(key=f"{file["id"]}",css_styles='''
+                    with stylable_container(key=f"{file[id]}",css_styles='''
                         button {
                             background-color: #f1f2f4;
                             color: #202123;
@@ -181,7 +181,7 @@ def sidebar():
                         if st.button("📄 " + file['name'], use_container_width=True, key=f"{idx}"):
                             with st.spinner("Getting summary..."):
                                 try:
-                                    response = requests.get(API_URL + f"smr/{file["id"]}")
+                                    response = requests.get(API_URL + f"smr/{file[id]}")
                                     if response.status_code == 200:
                                         st.session_state.summary = response.json()["summary"]
                                     else:
@@ -198,7 +198,7 @@ def sidebar():
                             # get chat history
                             with st.spinner("Retrieving chat history..."):
                                 try:
-                                    response = requests.get(API_URL + f"chat/{file["id"]}")
+                                    response = requests.get(API_URL + f"chat/{file[id]}")
                                     if response.status_code == 200:
                                         history = response.json()
                                         st.session_state.messages = history["history"]
@@ -241,7 +241,7 @@ def chat_page():
         st.session_state.messages.append({"role": "user", "content": prompt})
         data = {
             "prompt": prompt,
-            "file_id": st.session_state.selected_file["id"]
+            "file_id": st.session_state.selected_file[id]
         }
         with st.spinner("Wait a minute..."):
             try:

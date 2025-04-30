@@ -3,24 +3,21 @@ import os
 import re
 import uuid
 
-import pymupdf4llm  # Replaced fitz with pymupdf4llm
+import pymupdf4llm
 import spacy
-from dotenv import load_dotenv
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_google_genai import GoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from neo4j import GraphDatabase
-from prompt import QNA_PROMPT
 
-#======== Comment when using docker
-# spacy.cli.download("en_core_web_sm")
-#========
+from utils.config import GEMINI_API_KEY, NEO4J_PASSWORD, NEO4J_URI, NEO4J_USERNAME
+from utils.prompt import QNA_PROMPT
+
+# ======== Comment when using docker
+spacy.cli.download("en_core_web_sm")
+# ========
 
 # ==================================================
-load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-NEO4J_URI = os.getenv("NEO4J_URI")
-NEO4J_USERNAME = os.getenv("NEO4J_USERNAME")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
+
 
 class PDFProcessor:
     def __init__(self):
@@ -39,7 +36,9 @@ class PDFProcessor:
         """
         try:
             markdown_text = pymupdf4llm.to_markdown(pdf_path)
-            logging.info(f"Extracted Markdown text from {pdf_path}, length: {len(markdown_text)} characters")
+            logging.info(
+                f"Extracted Markdown text from {pdf_path}, length: {len(markdown_text)} characters"
+            )
             return markdown_text.strip()
         except Exception as e:
             logging.error(f"Error extracting text from {pdf_path}: {e}")
@@ -54,7 +53,7 @@ class TextSplitter:
     ):
         self.splitter = SemanticChunker(
             GoogleGenerativeAIEmbeddings(
-                model=model_name, google_api_key=os.getenv("GEMINI_API_KEY")
+                model=model_name, google_api_key=GEMINI_API_KEY
             ),
             breakpoint_threshold_type=breakpoint_threshold_type,
         )
@@ -72,7 +71,7 @@ class TextSplitter:
         """
         sections = []
         current_section = []
-        
+
         for line in markdown_text.splitlines():
             if line.startswith("## "):
                 if current_section:
@@ -82,16 +81,16 @@ class TextSplitter:
                     current_section.append(line)
             else:
                 current_section.append(line)
-        
+
         if current_section:
             sections.append("\n".join(current_section))
-        
+
         # Split each section using SemanticChunker
         chunks = []
         for section in sections:
             section_chunks = self.splitter.split_text(section)
             chunks.extend(section_chunks)
-        
+
         print(f"Split text into {len(chunks)} chunks")
         return chunks
 
@@ -387,10 +386,14 @@ class RAGSystem:
         self.db_connector.close()
 
 
-
-
 PDF_ID = None
 RAG_SYSTEM = RAGSystem()
+
+
+def current_pdf():
+    global PDF_ID
+    return PDF_ID
+
 
 def read_pdf(pdf_path: str):
     """Reads a PDF file and processes it."""

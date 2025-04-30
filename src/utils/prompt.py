@@ -44,3 +44,13 @@ Your task is to analyze the question carefully and classify it strictly as eithe
 
 Please respond with only one word: either "safe" or "unsafe", without any additional explanation or text.
 """.strip()
+
+# ==============================================================================
+
+# Help Message
+HELPER = """
+- `/summarize` + text or [sections_id]: to summarize text or sections.
+- `/sections`: show list of detected sections.
+- `/help`: show this help message.
+Other inputs are treated as Q&A prompt for this paper!
+""".strip()
