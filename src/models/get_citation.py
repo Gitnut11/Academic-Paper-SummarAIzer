@@ -103,7 +103,7 @@ def extract_citations_with_gemini(markdown_text, llm, prompt, output_parser):
         response = llm.invoke(formatted_prompt)
         parsed_output = output_parser.parse(response)
         # Convert list to dictionary with index as key
-        citations_dict = [{"title": citation["title"], "urls": citation["urls"]} for citation in parsed_output.get("citations", [])]
+        citations_dict = [{"title": citation["title"], "urls": citation["urls"][0] if citation["urls"] is not None and len(citation["urls"]) > 0 else None} for citation in parsed_output.get("citations", [])]
         return citations_dict
     except Exception as e:
         raise Exception(f"Gemini processing failed: {e}")
