@@ -103,12 +103,7 @@ def extract_citations_with_gemini(markdown_text, llm, prompt, output_parser):
         response = llm.invoke(formatted_prompt)
         parsed_output = output_parser.parse(response)
         # Convert list to dictionary with index as key
-        citations_dict = {
-            citation["index"]: {
-                "title": citation["title"],
-                "urls": citation["urls"]
-            } for citation in parsed_output.get("citations", [])
-        }
+        citations_dict = [{"title": citation["title"], "urls": citation["urls"]} for citation in parsed_output.get("citations", [])]
         return citations_dict
     except Exception as e:
         raise Exception(f"Gemini processing failed: {e}")
@@ -134,4 +129,5 @@ def get_dictionary_of_urls(pdf_path):
         return {}
 
 if __name__ == "__main__":
-    get_dictionary_of_urls("test.pdf")
+    a = get_dictionary_of_urls("test.pdf")
+    print(a)
