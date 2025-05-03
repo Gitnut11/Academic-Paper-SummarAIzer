@@ -156,8 +156,7 @@ class Database:
         save_path = os.path.join(self.file_dir, saved_file_name)
         with open(save_path, "wb") as f:
             f.write(file_binary)
-        # smr = summarize(self.pdf_extract.extract_text(save_path))
-        smr="abc"
+        smr = summarize(self.pdf_extract.extract_text(save_path))
         file_id = read_pdf(save_path)
         page_num = get_pdf_page_count(save_path)
         self.insert_user_file(file_id, user_id, save_path, file_name, smr, page_num)
