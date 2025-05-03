@@ -1,13 +1,13 @@
 import os
 
 from fastapi import UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import Response, JSONResponse
 
 from utils.prompt import HELPER
 from database.database import Database
-from models.qna import PDFProcessor, clear_pdf, current_pdf, qna, read_pdf
+from models.qna import PDFProcessor, clear_pdf, qna
 from models.summarize import summarize
-from utils.pdf_utils import get_sections
+from utils.pdf_utils import get_sections, extract_page_as_binary
 
 
 def db_register(username: str, password: str) -> dict | JSONResponse:
@@ -49,20 +49,14 @@ def db_upload_file(user_id: str, file: UploadFile):
             )
 
 
-def db_get_pdf(file_id: int):
+def db_get_pdf(file_id: str, num: int):
     with Database() as db:
         try:
             file_path, file_name = db.get_file_by_id(file_id)
-            if os.path.exists(file_path):
-                return FileResponse(
-                    path=file_path,
-                    filename=f"{file_name}.pdf",
-                    media_type="application/pdf",
-                )
-            return JSONResponse(
-                content={"error": "File not found"},
-                status_code=400,
-            )
+            if not os.path.exists(file_path):
+                return JSONResponse(content={"error": "File not found"}, status_code=400)
+            binary = extract_page_as_binary(file_path, num)
+            return Response(content=binary, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={file_name}_{num}.pdf"})
         except Exception as e:
             return JSONResponse(
                 content={"error": str(e)},
@@ -107,7 +101,7 @@ def db_chatbot(prompt: str, file_id: int):
                     Unknown command detected, use `/help` for some instruction
                 """
             else:
-                reply = qna(prompt)["answer"]
+                reply = qna(prompt, file_id)["answer"]
 
             db.log_chat(file_id, reply, roloe="assistant")
             return {"response": reply}
@@ -128,30 +122,6 @@ def db_smr(file_id: int):
                 content={"error": str(e)},
                 status_code=500,
             )
-
-
-def db_load_pdf(file_id: int):
-    with Database() as db:
-        last = current_pdf()
-        file = db.get_file_by_id(file_id)
-
-        if file is None:
-            return JSONResponse(
-                content={"error": "File not found"},
-                status_code=400,
-            )
-        file_path = file[0]
-        result = read_pdf(file_path)
-        if last != result:
-            return JSONResponse(
-                content={"success": "Chose a new pdf"},
-                status_code=400,
-            )
-        return JSONResponse(
-            content={"error": "Internal error"},
-            status_code=500,
-        )
-
 
 def db_remove_pdf():
     if clear_pdf():

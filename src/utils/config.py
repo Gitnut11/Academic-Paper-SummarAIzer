@@ -7,7 +7,7 @@ load_dotenv(dotenv_path="../.env")
 
 # Reset log every run (should be changed later)
 if not logging.getLogger().handlers:
-    log_path = os.path.join("log", ".log")
+    log_path = ".log"
     with open(log_path, "w") as f:
         f.write("")
     # Create a log file if it doesn't exist

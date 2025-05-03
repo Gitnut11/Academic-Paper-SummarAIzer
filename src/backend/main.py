@@ -28,7 +28,6 @@ async def login(
 ):
     return db_login(username, password)
 
-
 @app.post("/upload")
 async def upload_file(
     user_id: str = Form(...),
@@ -36,36 +35,28 @@ async def upload_file(
 ):
     return db_upload_file(user_id, file)
 
-
-@app.get("/pdf/{id}")
-async def pdf(id: int):
-    return db_get_pdf(id)
+@app.get("/pdf/{id}/{num}")
+async def pdf(id: str, num: int):
+    return db_get_pdf(id, num)
 
 
 @app.get("/chat/{file_id}")
-async def chat(file_id: int):
+async def chat(file_id: str):
     return db_get_chat(file_id)
 
 
 @app.post("/chatbot")
-async def chatbot(prompt: str = Form(...), file_id: int = Form(...)):
+async def chatbot(prompt: str = Form(...), file_id: str = Form(...)):
     return db_chatbot(prompt, file_id)
 
 
 @app.get("/smr/{file_id}")
-async def smr(file_id: int):
+async def smr(file_id: str):
     return db_smr(file_id)
 
-
-@app.get("/pdf-update/{file_id}")
-async def load_pdf(file_id):
-    return db_load_pdf(file_id)
-
-
-@app.get("/pdf-clear")
-async def remove_pdf():
-    return db_remove_pdf()
-
+# @app.get("/pdf-clear")
+# async def remove_pdf():
+#     return db_remove_pdf()
 
 # if __name__ == "__main__":
 #     import uvicorn

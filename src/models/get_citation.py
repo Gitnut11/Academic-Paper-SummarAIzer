@@ -103,12 +103,12 @@ def extract_citations_with_gemini(markdown_text, llm, prompt, output_parser):
         response = llm.invoke(formatted_prompt)
         parsed_output = output_parser.parse(response)
         # Convert list to dictionary with index as key
-        citations_dict = [{"title": citation["title"], "urls": citation["urls"][0] if citation["urls"] is not None and len(citation["urls"]) > 0 else None} for citation in parsed_output.get("citations", [])]
+        citations_dict = [{"title": citation["title"], "url": citation["urls"][0] if citation["urls"] is not None and len(citation["urls"]) > 0 else "null"} for citation in parsed_output.get("citations", [])]
         return citations_dict
     except Exception as e:
         raise Exception(f"Gemini processing failed: {e}")
 
-def get_dictionary_of_urls(pdf_path):
+def get_list_of_urls(pdf_path):
     """Extract citation titles and URLs from a PDF, plus citing papers' URLs."""
     try:
         llm = setup_gemini()
@@ -126,8 +126,8 @@ def get_dictionary_of_urls(pdf_path):
         return citations_dict
     except Exception as e:
         print(f"Error: {e}")
-        return {}
+        return []
 
 if __name__ == "__main__":
-    a = get_dictionary_of_urls("test.pdf")
+    a = get_list_of_urls("test.pdf")
     print(a)

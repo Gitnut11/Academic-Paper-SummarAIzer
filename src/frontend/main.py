@@ -4,7 +4,7 @@ import base64
 from streamlit_extras.stylable_container import stylable_container
 
 
-API_URL = "http://localhost:8000/"
+API_URL = "http://localhost:8000"
 
 
 def preset_states():
@@ -30,6 +30,7 @@ def set_response(response: str, status: bool):
 
 
 def login_page():
+    st.write(API_URL)
     st.title("AI Summarizer", anchor=False)
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
@@ -39,7 +40,7 @@ def login_page():
         if st.button("Login", use_container_width=True, type="primary"):
             data = {"username": username, "password": password}
             try:
-                response = requests.post(API_URL + "login", data=data)
+                response = requests.post(API_URL + "/login", data=data)
                 if response.status_code == 200:
                     user_data = response.json()
                     # get user id and list of files (file id, file name)
@@ -55,7 +56,7 @@ def login_page():
         if st.button("Register", use_container_width=True, type="primary"):
             data = {"username": username, "password": password}
             try:
-                response = requests.post(API_URL + "register", data=data)
+                response = requests.post(API_URL + "/register", data=data)
                 if response.status_code == 200:
                     res = response.json()
                     set_response(res['message'], True)
@@ -79,9 +80,9 @@ def entry_page():
     st.title("Paper Summarizer", anchor=False)
     st.markdown(
         """
-        Blah blah
+        Welcome!
 
-        **👈 Uplaoad a pdf paper to start summarizing!
+        **👈 Upload a pdf paper to start summarizing!
         """
     )
 
@@ -100,7 +101,7 @@ def sidebar():
                 files = {"file": (uploaded_file.name,
                                   uploaded_file, uploaded_file.type)}
                 response = requests.post(
-                    API_URL + "upload", data=data, files=files)
+                    API_URL + "/upload", data=data, files=files)
                 st.session_state.file_list = response.json()
                 st.rerun()
 
@@ -116,17 +117,17 @@ def sidebar():
             if st.button("<", use_container_width=True, disabled=num == 1) and num > 1:
                 num -= 1
         with col3:
-            if st.button("\>", use_container_width=True, disabled=num == st.session_state.selected_file[num]) and num < st.session_state.selected_file[num]:
+            if st.button("\>", use_container_width=True, disabled=num == st.session_state.selected_file['num']) and num < st.session_state.selected_file['num']:
                 num += 1
         with col2:
-            st.markdown(f"<div style='text-align:center; font-size: 18px;'>Page {num} / {st.session_state.selected_file[num]}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center; font-size: 18px;'>Page {num} / {st.session_state.selected_file['num']}</div>", unsafe_allow_html=True)
 
         # num = st.number_input("page number:", min_value=1, max_value=st.session_state.selected_file["num"], value= step=1)
         if num != st.session_state.page_num or "binary" not in st.session_state.selected_file:
             st.session_state.page_num = num
             with st.spinner("Requesting file..."):
                 response = requests.get(
-                    API_URL + f"pdf/{st.session_state.selected_file[id]}/{st.session_state.page_num}")
+                    API_URL + f"/pdf/{st.session_state.selected_file['id']}/{st.session_state.page_num}")
                 if response.status_code == 200:
                     st.session_state.selected_file["binary"] = response.content
                 else:
@@ -137,13 +138,13 @@ def sidebar():
             
 
     # upload button
-    if st.sidebar.button("Upload", use_container_width=True, type="primary"):
-        upload_dialog()
     with st.sidebar:
-        tab1, tab2 = st.tabs(["📁 File selection", "📝 Current file"])
-        with tab1:
-            # style uploaded files on sidebar
-            st.markdown("""
+        if st.button("Log-out", use_container_width=True, type="tertiary"):
+            st.session_state.clear()
+            st.rerun()
+        if st.button("Upload", use_container_width=True, type="primary"):
+            upload_dialog()
+        st.markdown("""
                 <style>
                 section[data-testid="stSidebar"] [data-testid=stVerticalBlock]{
                     gap: 0rem;
@@ -154,13 +155,16 @@ def sidebar():
                 }
                 </style>
             """, unsafe_allow_html=True)
+        tab1, tab2 = st.tabs(["📁 File selection", "📝 Current file"])
+        with tab1:
+            # style uploaded files on sidebar
 
         # ------------------------------ choose another file
             # file list, each is a button to navigate to the corresponding file 
             st.subheader("Your file list")
             if len(st.session_state.file_list) != 0:
                 for idx, file in enumerate(st.session_state.file_list):
-                    with stylable_container(key=f"{file[id]}",css_styles='''
+                    with stylable_container(key=f"{file['id']}",css_styles='''
                         button {
                             background-color: #f1f2f4;
                             color: #202123;
@@ -181,7 +185,7 @@ def sidebar():
                         if st.button("📄 " + file['name'], use_container_width=True, key=f"{idx}"):
                             with st.spinner("Getting summary..."):
                                 try:
-                                    response = requests.get(API_URL + f"smr/{file[id]}")
+                                    response = requests.get(API_URL + f"/smr/{file['id']}")
                                     if response.status_code == 200:
                                         st.session_state.summary = response.json()["summary"]
                                     else:
@@ -198,7 +202,7 @@ def sidebar():
                             # get chat history
                             with st.spinner("Retrieving chat history..."):
                                 try:
-                                    response = requests.get(API_URL + f"chat/{file[id]}")
+                                    response = requests.get(API_URL + f"/chat/{file['id']}")
                                     if response.status_code == 200:
                                         history = response.json()
                                         st.session_state.messages = history["history"]
@@ -217,9 +221,15 @@ def sidebar():
                 st.subheader("Summarize")
                 with st.container(height=200):
                     st.write(st.session_state.summary)        
-                st.subheader("FAQ")
+                st.subheader("Citation")
+                for cite in st.session_state.selected_file["cite"]:
+                    if cite["url"] != "null":
+                        st.markdown(f"""- {cite['title']}[link]({cite['url']})""")
+                    else:
+                        st.markdown(f"""- {cite['title']}""")
             else:
-                st.write("select a file first...")
+                st.caption("select a file first...")
+
 
 @st.cache_data
 def displayPDF(file):
@@ -241,11 +251,11 @@ def chat_page():
         st.session_state.messages.append({"role": "user", "content": prompt})
         data = {
             "prompt": prompt,
-            "file_id": st.session_state.selected_file[id]
+            "file_id": st.session_state.selected_file['id']
         }
         with st.spinner("Wait a minute..."):
             try:
-                response = requests.post(API_URL + "chatbot", data=data)
+                response = requests.post(API_URL + "/chatbot", data=data)
                 if response.status_code == 200:
                     reply = response.json()
                     st.session_state.messages.append({"role": "assistant", "content": reply["response"]})
