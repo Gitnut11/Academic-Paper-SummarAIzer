@@ -9,8 +9,8 @@ from models.summarize import summarize
 from utils.pdf_utils import get_pdf_page_count
 from models.get_citation import get_list_of_urls
 
-database_path = "database.db"
-storing_dir = os.path.join("..", "file")  # Outside of `src` folder
+database_path = "sqlite_db/database.db"
+storing_dir = os.path.join("..", "..", "file")  # Outside of `src` folder
 
 
 class Database:
@@ -157,7 +157,10 @@ class Database:
         with open(save_path, "wb") as f:
             f.write(file_binary)
         smr = summarize(self.pdf_extract.extract_text(save_path))
+        # smr = "Temporary summary"  # Placeholder for the actual summary
         file_id = read_pdf(save_path)
+        import logging
+        logging.info(f"[INFO] File ID: {file_id}")
         page_num = get_pdf_page_count(save_path)
         self.insert_user_file(file_id, user_id, save_path, file_name, smr, page_num)
         self.create_citation_table(file_id, save_path)

@@ -30,8 +30,7 @@ def set_response(response: str, status: bool):
 
 
 def login_page():
-    st.write(API_URL)
-    st.title("AI Summarizer", anchor=False)
+    st.title("Scientific Paper SummarAIzer", anchor=False)
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
@@ -163,6 +162,7 @@ def sidebar():
             # file list, each is a button to navigate to the corresponding file 
             st.subheader("Your file list")
             if len(st.session_state.file_list) != 0:
+                print(st.session_state.file_list)
                 for idx, file in enumerate(st.session_state.file_list):
                     with stylable_container(key=f"{file['id']}",css_styles='''
                         button {
@@ -172,7 +172,7 @@ def sidebar():
                             border-radius: 0%;
                             white-space: nowrap;
                             text-overflow: ellipsis;
-                            overflow: hidde;
+                            overflow: hide;
                             text-align: left;
                             transition: all 0.2s ease-in-out;
                             font-size: 0.9rem;

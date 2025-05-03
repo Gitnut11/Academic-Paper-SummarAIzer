@@ -1,7 +1,8 @@
+import logging
+
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-
-from database.db_functions import *
+from sqlite_db.db_functions import *
 
 app = FastAPI()
 app.add_middleware(
@@ -11,6 +12,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Reset log every run (should be changed later)
+if not logging.getLogger().handlers:
+    log_path = ".log"
+    with open(log_path, "w") as f:
+        f.write("")
+    # Create a log file if it doesn't exist
+    logging.basicConfig(
+        filename=log_path,  # The log file path
+        level=logging.INFO,  # Log level; change to DEBUG for more detailed output
+        format="%(asctime)s - %(levelname)s - %(message)s",  # Format for each log message
+    )
 
 
 @app.post("/register")
@@ -28,12 +42,14 @@ async def login(
 ):
     return db_login(username, password)
 
+
 @app.post("/upload")
 async def upload_file(
     user_id: str = Form(...),
     file: UploadFile = File(...),
 ):
     return db_upload_file(user_id, file)
+
 
 @app.get("/pdf/{id}/{num}")
 async def pdf(id: str, num: int):
@@ -54,10 +70,12 @@ async def chatbot(prompt: str = Form(...), file_id: str = Form(...)):
 async def smr(file_id: str):
     return db_smr(file_id)
 
+
 # @app.get("/pdf-clear")
 # async def remove_pdf():
 #     return db_remove_pdf()
 
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="127.0.0.1", port=8000)
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

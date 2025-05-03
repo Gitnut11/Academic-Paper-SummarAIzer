@@ -1,4 +1,4 @@
-> Put the `.env` file in the `src` folder
+> Put the `.env` file outside in the project folder
 
 ## Run with docker
 > Remember to define torch+ cpu or cuda version, to narrow down the installing time -- Using torch+cpu here ~ 330s
@@ -24,12 +24,12 @@ docker run -d --name neo4j-server --env-file config/.env -p 7474:7474 -p 7687:76
 ### Install dependencies
 ### Run backend
 ```
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Run frontend
 ```
-streamlit run frontend/main.py
+streamlit run main.py
 ```
 
 ## Ports

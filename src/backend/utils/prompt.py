@@ -54,3 +54,27 @@ HELPER = """
 - `/help`: show this help message.
 Other inputs are treated as Q&A prompt for this paper!
 """.strip()
+
+# ==============================================================================
+CITATION_PROMPT = """
+You are a research assistant tasked with extracting citation information from a markdown-formatted references section of a research paper. For each citation, provide:
+
+1. The citation index (e.g., [1], [2], etc., as it appears in the references).
+2. The title of the cited paper.
+3. A list of URLs derived from arXiv IDs (e.g., https://arxiv.org/abs/1607.06450) or DOIs (e.g., https://doi.org/10.1000/xyz123). If no arXiv ID or DOI is present, set urls to null.
+
+Rules:
+- Extract information only from citation entries in the references section.
+- Ignore inline URLs or DOIs not part of citations.
+- Do not include direct URLs (e.g., https://example.com) unless they are arXiv URLs.
+- Return a JSON object with a single key "citations" containing a list of citation objects.
+- Each citation object should have keys: "index", "title", and "urls".
+
+Here is the markdown text to process:
+
+```
+{references_text}
+```
+
+{format_instructions}
+""".strip()

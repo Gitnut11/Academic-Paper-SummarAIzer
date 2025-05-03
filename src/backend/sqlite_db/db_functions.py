@@ -4,7 +4,7 @@ from fastapi import UploadFile
 from fastapi.responses import Response, JSONResponse
 
 from utils.prompt import HELPER
-from database.database import Database
+from sqlite_db.database import Database
 from models.qna import PDFProcessor, clear_pdf, qna
 from models.summarize import summarize
 from utils.pdf_utils import get_sections, extract_page_as_binary
@@ -64,7 +64,7 @@ def db_get_pdf(file_id: str, num: int):
             )
 
 
-def db_get_chat(file_id: int):
+def db_get_chat(file_id: str):
     with Database() as db:
         try:
             chat_hist = db.get_history(file_id)
@@ -76,7 +76,7 @@ def db_get_chat(file_id: int):
             )
 
 
-def db_chatbot(prompt: str, file_id: int):
+def db_chatbot(prompt: str, file_id: str):
     with Database() as db:
         try:
             db.log_chat(file_id, prompt, role="user")
@@ -90,6 +90,7 @@ def db_chatbot(prompt: str, file_id: int):
                 pdf_process = PDFProcessor()
                 text = pdf_process.extract_text(file[0])
                 reply = summarize(text)
+                # reply = "Temporary summary"  # Placeholder for the actual summary
             elif command == "/sections":
                 file = db.get_file_by_id(file_id)
                 sections = get_sections(file[0])
@@ -103,7 +104,7 @@ def db_chatbot(prompt: str, file_id: int):
             else:
                 reply = qna(prompt, file_id)["answer"]
 
-            db.log_chat(file_id, reply, roloe="assistant")
+            db.log_chat(file_id, reply, role="assistant")
             return {"response": reply}
         except Exception as e:
             return JSONResponse(
@@ -112,7 +113,7 @@ def db_chatbot(prompt: str, file_id: int):
             )
 
 
-def db_smr(file_id: int):
+def db_smr(file_id: str):
     with Database() as db:
         try:
             text = db.get_smr_by_id(file_id)[0]

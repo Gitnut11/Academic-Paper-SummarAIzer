@@ -12,11 +12,11 @@ services:
 
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./src/backend
+      dockerfile: Dockerfile
     container_name: backend
     env_file:
-      - ./.env       # expose NEO4J_URI, NEO4J_PASSWORD, any other secrets
+      - .env       # expose NEO4J_URI, NEO4J_PASSWORD, any other secrets
     volumes:
       - ./database:/app/database   # persist your SQLite DB
     ports:
@@ -26,8 +26,8 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./src/frontend
+      dockerfile: Dockerfile
       args:
         API_URL: "http://backend:8000"
     container_name: frontend

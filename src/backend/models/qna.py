@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 import uuid
 
@@ -8,7 +7,6 @@ import spacy
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_google_genai import GoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from neo4j import GraphDatabase
-
 from utils.config import GEMINI_API_KEY, NEO4J_PASSWORD, NEO4J_URI, NEO4J_USERNAME
 from utils.prompt import QNA_PROMPT
 
@@ -21,8 +19,7 @@ spacy.cli.download("en_core_web_sm")
 
 class PDFProcessor:
     def __init__(self):
-        # Set up basic logging
-        logging.basicConfig(level=logging.INFO)
+        ...
 
     def extract_text(self, pdf_path):
         """
@@ -362,6 +359,7 @@ class RAGSystem:
             self.db_connector.store_embeddings(
                 chunks, embeddings, pdf_id, entities_list
             )
+            print(f"Stored {len(chunks)} chunks with embeddings and entities")
             logging.info(
                 f"Processed and stored embeddings and entities for {pdf_path} with PDF ID: {pdf_id}"
             )

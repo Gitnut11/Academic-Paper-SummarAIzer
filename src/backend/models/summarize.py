@@ -2,13 +2,13 @@ import gc
 import logging
 
 # ======== Comment when using docker
-import nltk
+# import nltk
 import torch
 from peft import PeftModel
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-nltk.download("punkt")
-nltk.download("punkt_tab")
+# nltk.download("punkt")
+# nltk.download("punkt_tab")
 # ========
 from nltk.tokenize import sent_tokenize
 
