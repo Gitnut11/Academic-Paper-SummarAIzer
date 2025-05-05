@@ -1,11 +1,14 @@
-import json
+import logging
 
 import pymupdf4llm
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from langchain.prompts import PromptTemplate
 from langchain_google_genai import GoogleGenerativeAI
+
 from utils.config import GEMINI_API_KEY
 from utils.prompt import CITATION_PROMPT
+
+logger = logging.getLogger(__name__)
 
 
 def setup_gemini():

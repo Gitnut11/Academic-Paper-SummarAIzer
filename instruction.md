@@ -1,4 +1,14 @@
+# Things to do
+- deal neo4j locally
+- handle logging
+- print
+- find a way to minimize torch
+
+
 > Put the `.env` file outside in the project folder
+## Note
+`NEO4J_URI="bolt://neo4j:7687"`\
+`NEO4J_USERNAME="neo4j"`
 
 ## Run with docker
 > Remember to define torch+ cpu or cuda version, to narrow down the installing time -- Using torch+cpu here ~ 330s

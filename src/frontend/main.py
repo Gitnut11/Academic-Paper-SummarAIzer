@@ -224,9 +224,9 @@ def sidebar():
                 st.subheader("Citation")
                 for cite in st.session_state.selected_file["cite"]:
                     if cite["url"] != "null":
-                        st.markdown(f"""- {cite['title']}[link]({cite['url']})""")
+                        st.markdown(f"""- {cite['title']} [link]({cite['url']})""")
                     else:
-                        st.markdown(f"""- {cite['title']}""")
+                        st.markdown(f"""- {cite['title']} """)
             else:
                 st.caption("select a file first...")
 

@@ -4,10 +4,10 @@ import random
 import sqlite3
 import string
 
+from models.get_citation import get_list_of_urls
 from models.qna import PDFProcessor, read_pdf
 from models.summarize import summarize
 from utils.pdf_utils import get_pdf_page_count
-from models.get_citation import get_list_of_urls
 
 database_path = "sqlite_db/database.db"
 storing_dir = os.path.join("..", "..", "file")  # Outside of `src` folder
@@ -131,7 +131,9 @@ class Database:
                 return rand_str + ".pdf"
 
     # insert to files table
-    def insert_user_file(self, file_id, user_id, file_path, display_name, summarize, page_num):
+    def insert_user_file(
+        self, file_id, user_id, file_path, display_name, summarize, page_num
+    ):
         if not os.path.isfile(file_path):
             print(f"[ERROR] File '{file_path}' does not exist or is not a file")
             return
@@ -157,10 +159,8 @@ class Database:
         with open(save_path, "wb") as f:
             f.write(file_binary)
         smr = summarize(self.pdf_extract.extract_text(save_path))
-        # smr = "Temporary summary"  # Placeholder for the actual summary
+        # smr = "temp smr"
         file_id = read_pdf(save_path)
-        import logging
-        logging.info(f"[INFO] File ID: {file_id}")
         page_num = get_pdf_page_count(save_path)
         self.insert_user_file(file_id, user_id, save_path, file_name, smr, page_num)
         self.create_citation_table(file_id, save_path)
@@ -183,7 +183,7 @@ class Database:
         for cite in cites:
             self.cursor.execute(
                 f"INSERT INTO {table_name} (title, url) VALUES (?, ?)",
-                (cite["title"], cite["url"])
+                (cite["title"], cite["url"]),
             )
         self.connect.commit()
 
@@ -197,7 +197,10 @@ class Database:
             (user_id,),
         )
         result = self.cursor.fetchall()
-        file_list = [{"id": file_id, "name": file_name, "num": page_num} for (file_id, file_name, page_num) in result]
+        file_list = [
+            {"id": file_id, "name": file_name, "num": page_num}
+            for (file_id, file_name, page_num) in result
+        ]
         for file in file_list:
             self.cursor.execute(
                 f"""SELECT title, url FROM {self.citation_table(file["id"])}"""
@@ -206,7 +209,6 @@ class Database:
             cites = self.cursor.fetchall()
             file["cite"] = [{"title": title, "url": url} for title, url in cites]
         return file_list
-
 
     # get file with id
     def get_file_by_id(self, id):
@@ -241,6 +243,7 @@ class Database:
 
     def chatlog_table(self, file_id):
         return "chat_" + hashlib.sha256(file_id.encode()).hexdigest()
+
     # create chatlog for new file
     def create_chatlog_table(self, file_id):
         table_name = self.chatlog_table(file_id)

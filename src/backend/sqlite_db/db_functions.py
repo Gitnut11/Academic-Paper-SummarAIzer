@@ -1,13 +1,13 @@
 import os
 
 from fastapi import UploadFile
-from fastapi.responses import Response, JSONResponse
-
-from utils.prompt import HELPER
-from sqlite_db.database import Database
+from fastapi.responses import JSONResponse, Response
 from models.qna import PDFProcessor, clear_pdf, qna
 from models.summarize import summarize
-from utils.pdf_utils import get_sections, extract_page_as_binary
+from sqlite_db.database import Database
+from utils.pdf_utils import extract_page_as_binary, get_sections
+from utils.prompt import HELPER
+from utils.safety_check import safety_check
 
 
 def db_register(username: str, password: str) -> dict | JSONResponse:
@@ -54,9 +54,17 @@ def db_get_pdf(file_id: str, num: int):
         try:
             file_path, file_name = db.get_file_by_id(file_id)
             if not os.path.exists(file_path):
-                return JSONResponse(content={"error": "File not found"}, status_code=400)
+                return JSONResponse(
+                    content={"error": "File not found"}, status_code=400
+                )
             binary = extract_page_as_binary(file_path, num)
-            return Response(content=binary, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={file_name}_{num}.pdf"})
+            return Response(
+                content=binary,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f"attachment; filename={file_name}_{num}.pdf"
+                },
+            )
         except Exception as e:
             return JSONResponse(
                 content={"error": str(e)},
@@ -102,7 +110,9 @@ def db_chatbot(prompt: str, file_id: str):
                     Unknown command detected, use `/help` for some instruction
                 """
             else:
-                reply = qna(prompt, file_id)["answer"]
+                reply = "The question is considered as a violation!!!!!"
+                if safety_check(prompt):
+                    reply = qna(prompt, file_id)["answer"]
 
             db.log_chat(file_id, reply, role="assistant")
             return {"response": reply}
@@ -123,6 +133,7 @@ def db_smr(file_id: str):
                 content={"error": str(e)},
                 status_code=500,
             )
+
 
 def db_remove_pdf():
     if clear_pdf():

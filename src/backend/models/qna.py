@@ -11,15 +11,16 @@ from utils.config import GEMINI_API_KEY, NEO4J_PASSWORD, NEO4J_URI, NEO4J_USERNA
 from utils.prompt import QNA_PROMPT
 
 # ======== Comment when using docker
-spacy.cli.download("en_core_web_sm")
+# spacy.cli.download("en_core_web_sm")
 # ========
+
+logger = logging.getLogger(__name__)
 
 # ==================================================
 
 
 class PDFProcessor:
-    def __init__(self):
-        ...
+    def __init__(self): ...
 
     def extract_text(self, pdf_path):
         """
@@ -33,12 +34,12 @@ class PDFProcessor:
         """
         try:
             markdown_text = pymupdf4llm.to_markdown(pdf_path)
-            logging.info(
-                f"Extracted Markdown text from {pdf_path}, length: {len(markdown_text)} characters"
+            logger.info(
+                f"Extracted Markdown text ({len(markdown_text)} characters)"
             )
             return markdown_text.strip()
         except Exception as e:
-            logging.error(f"Error extracting text from {pdf_path}: {e}")
+            logger.error(f"Error extracting text from {pdf_path}: {e}")
             raise
 
 
@@ -88,7 +89,7 @@ class TextSplitter:
             section_chunks = self.splitter.split_text(section)
             chunks.extend(section_chunks)
 
-        print(f"Split text into {len(chunks)} chunks")
+        logger.info(f"Splitted text into {len(chunks)} chunks")
         return chunks
 
 
@@ -104,20 +105,20 @@ class Embedder:
         """Embeds a single text."""
         try:
             embedding = self.embeddings.embed_query(text)
-            logging.info(f"Embedded query text, length: {len(embedding)}")
+            logger.info(f"Embedded query text, length: {len(embedding)}")
             return embedding
         except Exception as e:
-            logging.error(f"Error embedding query: {e}")
+            logger.error(f"Error embedding query: {e}")
             raise
 
     def embed_documents(self, texts):
         """Embeds multiple texts."""
         try:
             embeddings = self.embeddings.embed_documents(texts)
-            logging.info(f"Embedded {len(texts)} documents")
+            logger.info(f"Embedded {len(texts)} documents")
             return embeddings
         except Exception as e:
-            logging.error(f"Error embedding documents: {e}")
+            logger.error(f"Error embedding documents: {e}")
             raise
 
 
@@ -139,12 +140,15 @@ class DatabaseConnector:
 
     def __init__(self, uri, user, password):
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
-        logging.info("Connected to Neo4j Aura")
+        logger.info("Connected to Neo4j Aura")
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     def close(self):
         """Closes the database connection."""
         self.driver.close()
-        logging.info("Closed Neo4j Aura connection")
+        logger.info("Closed Neo4j Aura connection")
 
     def store_embeddings(self, chunks, embeddings, pdf_id, entities_list):
         """Stores text chunks, embeddings, and entities in Neo4j with a unique PDF ID."""
@@ -174,11 +178,11 @@ class DatabaseConnector:
                             entity=entity,
                             chunk_id=chunk_id,
                         )
-            logging.info(
-                f"Stored {len(chunks)} chunks with embeddings and entities for PDF ID: {pdf_id}"
+            logger.info(
+                f"Stored {len(chunks)} chunks with embeddings and entities for PDF ID ({pdf_id})"
             )
         except Exception as e:
-            logging.error(f"Error storing embeddings and entities in Neo4j: {e}")
+            logger.error(f"Error storing embeddings and entities in Neo4j: {e}")
             raise
 
     def retrieve_similar(self, query_embedding, pdf_id, top_k=5):
@@ -211,12 +215,12 @@ class DatabaseConnector:
                     top_k=top_k,
                 )
                 chunks = [record["text"].strip() for record in result]
-                logging.info(
-                    f"Retrieved {len(chunks)} chunks (including related) for PDF ID: {pdf_id}"
+                logger.info(
+                    f"Retrieved {len(chunks)} chunks (including related) for PDF ID ({pdf_id})"
                 )
                 return chunks
         except Exception as e:
-            logging.error(f"Error retrieving similar chunks: {e}")
+            logger.error(f"Error retrieving similar chunks: {e}")
             raise
 
     def delete_pdf_graph(self, pdf_id):
@@ -232,7 +236,7 @@ class DatabaseConnector:
                     """,
                     pdf_id=pdf_id,
                 )
-                logging.info(
+                logger.info(
                     f"Deleted Chunk nodes and relationships for PDF ID: {pdf_id}"
                 )
 
@@ -244,9 +248,9 @@ class DatabaseConnector:
                     DELETE e
                     """
                 )
-                logging.info("Deleted orphaned Entity nodes")
+                logger.info("Deleted orphaned Entity nodes")
         except Exception as e:
-            logging.error(f"Error deleting PDF graph for ID {pdf_id}: {e}")
+            logger.error(f"Error deleting PDF graph for ID {pdf_id}: {e}")
             raise
 
 
@@ -302,7 +306,7 @@ class Generator:
                 question=question, context=clean_context(context)
             )
             answer = self.llm.invoke(prompt)
-            logging.info(f"Generated answer for question: {question}")
+            logger.info(f"Generated answer for question: {question}")
             response = {}
             if "Answer" in answer and "References: " in answer:
                 ans, ref = answer.split("References: ")
@@ -325,7 +329,7 @@ class Generator:
             # return answer
             return response
         except Exception as e:
-            logging.error(f"Error generating answer: {e}")
+            logger.error(f"Error generating answer: {e}")
             raise
 
 
@@ -359,13 +363,13 @@ class RAGSystem:
             self.db_connector.store_embeddings(
                 chunks, embeddings, pdf_id, entities_list
             )
-            print(f"Stored {len(chunks)} chunks with embeddings and entities")
-            logging.info(
-                f"Processed and stored embeddings and entities for {pdf_path} with PDF ID: {pdf_id}"
+            # print(f"Stored {len(chunks)} chunks with embeddings and entities")
+            logger.info(
+                f"Processed and stored embeddings and entities for {pdf_path} with PDF ID ({pdf_id})"
             )
             return pdf_id
         except Exception as e:
-            logging.error(f"Error processing PDF {pdf_path}: {e}")
+            logger.error(f"Error processing PDF {pdf_path}: {e}")
             raise
 
     def answer_question(self, question, pdf_id):
@@ -376,12 +380,15 @@ class RAGSystem:
             answer = self.generator.generate_answer(question, relevant_chunks)
             return answer
         except Exception as e:
-            logging.error(f"Error answering question: {e}")
+            logger.error(f"Error answering question: {e}")
             raise
 
     def close(self):
         """Closes the database connection."""
         self.db_connector.close()
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
 
 PDF_ID = None
@@ -404,10 +411,10 @@ def clear_pdf(pdf_id: str):
     """Clears the processed PDF data."""
     if pdf_id is not None:
         RAG_SYSTEM.db_connector.delete_pdf_graph(pdf_id)
-        logging.info("Cleared processed PDF data")
+        logger.info("Cleared processed PDF data")
         return True
     else:
-        logging.warning("No PDF data to clear")
+        logger.warning("No PDF data to clear")
         return False
 
 

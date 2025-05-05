@@ -4,13 +4,13 @@ import logging
 # ======== Comment when using docker
 # import nltk
 import torch
-from peft import PeftModel
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 # nltk.download("punkt")
 # nltk.download("punkt_tab")
 # ========
 from nltk.tokenize import sent_tokenize
+from peft import PeftModel
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 BASE_MODEL = "allenai/led-base-16384"
 REPO_NAME = "Mels22/led-scisummnet"
@@ -18,6 +18,7 @@ REPO_NAME = "Mels22/led-scisummnet"
 CHUNK_SIZE = 8192
 OVERLAP_SIZE = 512
 MAX_TARGET_LENGTH = 1024
+logger = logging.getLogger(__name__)
 
 
 class LEDInference:
@@ -38,6 +39,7 @@ class LEDInference:
         self.model = PeftModel.from_pretrained(base_model, REPO_NAME)
         self.tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
         self.model = self.model.to(self.device)
+        logger.info(f"Loaded model from HUB, using device: {self.device}")
         self.model.eval()
 
     def _semantic_split(self, text):
@@ -121,24 +123,30 @@ class LEDInference:
     def infer(self, text):
         gc.collect()
         torch.cuda.empty_cache()
+        try:
+            tokenized_text = self.tokenizer.tokenize(text)
+            if len(tokenized_text) <= self.chunk_size:
+                logger.info(f"One chunk is acceptable")
+                # Direct summarization
+                return self._batch_summarize([text])[0]
+            
+            logger.info(f"Splitted into chunks to summarize each part")
+            # Otherwise, semantic split
+            chunks = self._semantic_split(text)
 
-        tokenized_text = self.tokenizer.tokenize(text)
-        if len(tokenized_text) <= self.chunk_size:
-            # Direct summarization
-            return self._batch_summarize([text])[0]
+            # Batch summarize chunks
+            chunk_summaries = self._batch_summarize(chunks)
 
-        # Otherwise, semantic split
-        chunks = self._semantic_split(text)
+            combined_summary = " ".join(chunk_summaries)
 
-        # Batch summarize chunks
-        chunk_summaries = self._batch_summarize(chunks)
+            logger.info(f"Re-summarize the chunks")
+            # Final summarization
+            final_summary = self._batch_summarize([combined_summary])[0]
 
-        combined_summary = " ".join(chunk_summaries)
-
-        # Final summarization
-        final_summary = self._batch_summarize([combined_summary])[0]
-
-        return final_summary
+            return final_summary
+        except Exception as e:
+            logger.error(f"Error summarizing: {str(e)}")
+            raise e
 
 
 LED = LEDInference()
@@ -149,5 +157,5 @@ def summarize(text):
         summary = LED.infer(text)
         return summary
     except Exception as e:
-        logging.error(f"Error during summarization: {e}")
+        logger.error(f"Error during summarization: {e}")
         return None

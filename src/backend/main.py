@@ -1,5 +1,6 @@
 import logging
 
+import utils.config
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlite_db.db_functions import *
@@ -14,17 +15,17 @@ app.add_middleware(
 )
 
 
-# Reset log every run (should be changed later)
-if not logging.getLogger().handlers:
-    log_path = ".log"
-    with open(log_path, "w") as f:
-        f.write("")
-    # Create a log file if it doesn't exist
-    logging.basicConfig(
-        filename=log_path,  # The log file path
-        level=logging.INFO,  # Log level; change to DEBUG for more detailed output
-        format="%(asctime)s - %(levelname)s - %(message)s",  # Format for each log message
-    )
+logger = logging.getLogger(__name__)
+
+
+# @app.lifespan("startup")
+# async def startup_event():
+#     logger.info("Backend started")
+
+
+# @app.on_event("shutdown")
+# async def shutdown_event():
+#     logger.info("Backend stopped")
 
 
 @app.post("/register")
