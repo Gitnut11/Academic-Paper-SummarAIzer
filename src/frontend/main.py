@@ -162,7 +162,6 @@ def sidebar():
             # file list, each is a button to navigate to the corresponding file 
             st.subheader("Your file list")
             if len(st.session_state.file_list) != 0:
-                print(st.session_state.file_list)
                 for idx, file in enumerate(st.session_state.file_list):
                     with stylable_container(key=f"{file['id']}",css_styles='''
                         button {

@@ -35,6 +35,7 @@ class LEDInference:
         self.batch_size = batch_size
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        logger.info(f"Loading summarization model...")
         base_model = AutoModelForSeq2SeqLM.from_pretrained(BASE_MODEL)
         self.model = PeftModel.from_pretrained(base_model, REPO_NAME)
         self.tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
@@ -126,7 +127,7 @@ class LEDInference:
         try:
             tokenized_text = self.tokenizer.tokenize(text)
             if len(tokenized_text) <= self.chunk_size:
-                logger.info(f"One chunk is acceptable")
+                logger.info(f"Summaring in one chunk is enough")
                 # Direct summarization
                 return self._batch_summarize([text])[0]
             

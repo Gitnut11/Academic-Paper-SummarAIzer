@@ -1,4 +1,5 @@
 import os
+import logging
 
 from fastapi import UploadFile
 from fastapi.responses import JSONResponse, Response
@@ -10,10 +11,14 @@ from utils.prompt import HELPER
 from utils.safety_check import safety_check
 
 
+logger = logging.getLogger(__name__)
+
 def db_register(username: str, password: str) -> dict | JSONResponse:
     with Database() as db:
+        logger.info(f"Registering account: {username} - {password}")
         if db.create_user(username, password):
             return {"message": "User registered successfully"}
+        logger.error(f"Failed registering account")
         return JSONResponse(
             content={"error": "Username already exists"},
             status_code=400,
@@ -22,6 +27,7 @@ def db_register(username: str, password: str) -> dict | JSONResponse:
 
 def db_login(username: str, password: str) -> dict | JSONResponse:
     with Database() as db:
+        logger.info(f"Logging into account: {username}")
         user_id = db.login(username, password)
         if user_id:
             file_list = db.get_user_files(user_id)
@@ -29,6 +35,7 @@ def db_login(username: str, password: str) -> dict | JSONResponse:
                 "user_id": user_id,
                 "files": file_list,
             }
+        logger.info(f"Failed log in account, invalid username or password")
         return JSONResponse(
             content={"error": "Invalid username or password"},
             status_code=401,
@@ -38,11 +45,13 @@ def db_login(username: str, password: str) -> dict | JSONResponse:
 def db_upload_file(user_id: str, file: UploadFile):
     with Database() as db:
         try:
+            logger.info(f"Uploading file....")
             file_binary = file.file.read()
             db.insert_user_file_binary(user_id, file_binary, file.filename)
             file_list = db.get_user_files(user_id)
             return file_list
         except Exception as e:
+            logger.error(f"Error when uploading file: {str(e)}")
             return JSONResponse(
                 content={"error": str(e)},
                 status_code=500,
@@ -52,6 +61,7 @@ def db_upload_file(user_id: str, file: UploadFile):
 def db_get_pdf(file_id: str, num: int):
     with Database() as db:
         try:
+            logger.info(f"Getting pdf...")
             file_path, file_name = db.get_file_by_id(file_id)
             if not os.path.exists(file_path):
                 return JSONResponse(
@@ -66,6 +76,7 @@ def db_get_pdf(file_id: str, num: int):
                 },
             )
         except Exception as e:
+            logger.error(f"Failed to get pdf: {str(e)}")
             return JSONResponse(
                 content={"error": str(e)},
                 status_code=500,
@@ -75,9 +86,11 @@ def db_get_pdf(file_id: str, num: int):
 def db_get_chat(file_id: str):
     with Database() as db:
         try:
+            logger.info(f"Loading chat history...")
             chat_hist = db.get_history(file_id)
             return JSONResponse(content={"history": chat_hist})
         except Exception as e:
+            logger.error(f"Failed to load chat history: {str(e)}")
             return JSONResponse(
                 content={"error": str(e)},
                 status_code=500,
@@ -91,6 +104,7 @@ def db_chatbot(prompt: str, file_id: str):
             prompt = prompt.strip()
             command = prompt.split()[0]
 
+            logger.info(f"Receiving command: {command}")
             if command == "/help":
                 reply = HELPER
             elif command == "/summarize":
@@ -113,10 +127,14 @@ def db_chatbot(prompt: str, file_id: str):
                 reply = "The question is considered as a violation!!!!!"
                 if safety_check(prompt):
                     reply = qna(prompt, file_id)["answer"]
+                else:
+                    logger.info(f"Prompt Violation detected")
+                    
 
             db.log_chat(file_id, reply, role="assistant")
             return {"response": reply}
         except Exception as e:
+            logger.error(f"Failed to execute command: {str(e)}")
             return JSONResponse(
                 content={"error": str(e)},
                 status_code=500,
@@ -126,9 +144,11 @@ def db_chatbot(prompt: str, file_id: str):
 def db_smr(file_id: str):
     with Database() as db:
         try:
+            logger.info(f"Summarizing...")
             text = db.get_smr_by_id(file_id)[0]
             return JSONResponse(content={"summary": text})
         except Exception as e:
+            logger.error(f"Failed to summarizing: {str(e)}")
             return JSONResponse(
                 content={"error": str(e)},
                 status_code=500,

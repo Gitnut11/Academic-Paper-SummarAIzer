@@ -10,7 +10,9 @@ from models.summarize import summarize
 from utils.pdf_utils import get_pdf_page_count
 
 database_path = "sqlite_db/database.db"
-storing_dir = os.path.join("..", "..", "file")  # Outside of `src` folder
+storing_dir = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", "files"
+)  # Outside of `src` folder
 
 
 class Database:

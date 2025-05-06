@@ -15,10 +15,14 @@ services:
       context: ./src/backend
       dockerfile: Dockerfile
     container_name: backend
+    working_dir: /app
     env_file:
       - .env       # expose NEO4J_URI, NEO4J_PASSWORD, any other secrets
     volumes:
-      - ./logs/backend:/app/logs        # Persist logs on host
+      # - ./:/app
+      - ./file:/app/file
+      - ./src/logs/backend:/app/logs        # Persist logs on host
+      - ./src/backend/sqlite_db:/app/sqlite_db
       - ./.env:/app/.env:ro             # Mount .env for load_dotenv()
     environment:
       - LOG_DIR=/app/logs
@@ -35,7 +39,8 @@ services:
         API_URL: "http://backend:8000"
     container_name: frontend
     volumes:
-      - ./logs/frontend:/app/logs
+      - ./src/logs/frontend:/app/logs
+      # - ./:/app
     ports:
       - "8501:8501"
     depends_on:

@@ -27,6 +27,7 @@ def setup_gemini():
         )
         return llm
     except Exception as e:
+        logger.error(f"Failed to initialize Gemini: {str(e)}")
         raise Exception(f"Failed to initialize Gemini: {e}")
 
 
@@ -36,6 +37,7 @@ def extract_markdown(pdf_path):
         markdown_text = pymupdf4llm.to_markdown(pdf_path)
         return markdown_text
     except Exception as e:
+        logger.error(f"Failed to extract markdown from PDF: {str(e)}")
         raise Exception(f"Failed to extract markdown from PDF: {e}")
 
 
@@ -111,6 +113,7 @@ def extract_citations_with_gemini(markdown_text, llm, prompt, output_parser):
         ]
         return citations_dict
     except Exception as e:
+        logger.error(f"Gemini processing failed: {str(e)}")
         raise Exception(f"Gemini processing failed: {e}")
 
 
@@ -124,16 +127,9 @@ def get_list_of_urls(pdf_path):
             markdown_text, llm, prompt, output_parser
         )
 
-        # print("Citations Dictionary:")
-        # if not citations_dict:
-        #     print("No citations found.")
-        # else:
-        #     print(json.dumps(citations_dict, indent=2))
-        # print("\n")
-
         return citations_dict
     except Exception as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
         return []
 
 
