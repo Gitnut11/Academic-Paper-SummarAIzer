@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import base64
 from streamlit_extras.stylable_container import stylable_container
-
+from tos import TOS
 
 API_URL = "http://localhost:8000"
 
@@ -30,6 +30,22 @@ def set_response(response: str, status: bool):
 
 
 def login_page():
+    @st.dialog("Terms of Service")
+    def tos(username, password):
+        with st.container(height=700):
+            st.markdown(TOS)
+        if st.button("Accept & Register", use_container_width=True, type="primary"):
+            data = {"username": username, "password": password}
+            try:
+                response = requests.post(API_URL + "/register", data=data)
+                if response.status_code == 200:
+                    res = response.json()
+                    set_response(res['message'], True)
+                else:
+                    set_response("Username already exists", False)
+            except requests.exceptions.ConnectionError:
+                set_response("Server unavailable", False)
+
     st.title("Scientific Paper SummarAIzer", anchor=False)
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
@@ -53,16 +69,7 @@ def login_page():
 
     with register_container:
         if st.button("Register", use_container_width=True, type="primary"):
-            data = {"username": username, "password": password}
-            try:
-                response = requests.post(API_URL + "/register", data=data)
-                if response.status_code == 200:
-                    res = response.json()
-                    set_response(res['message'], True)
-                else:
-                    set_response("Username already exists", False)
-            except requests.exceptions.ConnectionError:
-                set_response("Server unavailable", False)
+            tos(username, password)
 
     # render message
     if st.session_state.login_form_response[0] != "":
@@ -99,10 +106,12 @@ def sidebar():
                 data = {"user_id": st.session_state.user_id}
                 files = {"file": (uploaded_file.name,
                                   uploaded_file, uploaded_file.type)}
-                response = requests.post(
-                    API_URL + "/upload", data=data, files=files)
-                st.session_state.file_list = response.json()
-                st.rerun()
+                response = requests.post(API_URL + "/upload", data=data, files=files)
+                if response.status_code == 200:
+                    st.session_state.file_list = response.json()
+                    st.rerun()
+                else:
+                    st.error("Error uploading to server")
 
     # open file
     @st.dialog("View PDF", width="large")
@@ -122,16 +131,16 @@ def sidebar():
             st.markdown(f"<div style='text-align:center; font-size: 18px;'>Page {num} / {st.session_state.selected_file['num']}</div>", unsafe_allow_html=True)
 
         # num = st.number_input("page number:", min_value=1, max_value=st.session_state.selected_file["num"], value= step=1)
-        if num != st.session_state.page_num or "binary" not in st.session_state.selected_file:
+        if num != st.session_state.page_num:
             st.session_state.page_num = num
             with st.spinner("Requesting file..."):
-                response = requests.get(
-                    API_URL + f"/pdf/{st.session_state.selected_file['id']}/{st.session_state.page_num}")
+                response = requests.get(API_URL + f"/pdf/{st.session_state.selected_file['id']}/{st.session_state.page_num}")
                 if response.status_code == 200:
                     st.session_state.selected_file["binary"] = response.content
+                    st.rerun(scope="fragment")
                 else:
                     st.error("error")
-            st.rerun(scope="fragment")
+            
         pdf_display = displayPDF(st.session_state.selected_file["binary"])
         st.markdown(pdf_display, unsafe_allow_html=True)
             
@@ -198,6 +207,10 @@ def sidebar():
                             st.session_state.selected_file = file
                             # reset view page
                             st.session_state.page_num = 1
+                            try:
+                                st.session_state.selected_file["binary"] = requests.get(API_URL + f"/pdf/{file['id']}/{1}").content
+                            except Exception:
+                                st.error("Error retrieving pdf")
                             # get chat history
                             with st.spinner("Retrieving chat history..."):
                                 try:
