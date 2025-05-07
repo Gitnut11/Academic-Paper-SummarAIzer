@@ -1,4 +1,4 @@
---index-url https://download.pytorch.org/whl/cu124
+--index-url https://download.pytorch.org/whl/cpu
 --extra-index-url https://pypi.org/simple
 
 fastapi==0.115.12
@@ -13,7 +13,8 @@ pypdf2==3.0.1
 pymupdf4llm==0.0.22
 python-dotenv==1.1.0
 spacy==3.8.5
-torch==2.5.1+cu124
+torch==2.5.1+cpu
+prometheus-fastapi-instrumentator==7.1.0
 python-multipart==0.0.20
 transformers==4.51.1
 uvicorn==0.34.2
