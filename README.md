@@ -68,7 +68,7 @@ cd Academic-Paper-SummarAIzer
 **2. Configure environment**  
 Create a `.env` file with the following:
 ```ini
-NEO4J_URI="bolt://localhost:7687" # Use this for using locally, or your provided URI
+NEO4J_URI="bolt://neo4j:7687" # Use this for using locally, or your provided URI
 NEO4J_USERNAME="neo4j"
 NEO4J_PASSWORD="your-password"
 
