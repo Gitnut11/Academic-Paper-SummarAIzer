@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def setup_gemini():
     """
-    Initialize the Gemini 1.5 Pro model using the GoogleGenerativeAI wrapper from LangChain.
+    Initialize the Gemini 2.0 Flash model using the GoogleGenerativeAI wrapper from LangChain.
 
     Raises:
         ValueError: if GEMINI_API_KEY is not set.
@@ -34,7 +34,7 @@ def setup_gemini():
             )
         # Initialize Gemini with desired parameters
         llm = GoogleGenerativeAI(
-            model="gemini-1.5-pro",
+            model="gemini-2.0-flash",
             google_api_key=api_key,
             temperature=0.2,
             max_output_tokens=4096,

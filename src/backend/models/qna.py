@@ -8,7 +8,7 @@ from langchain_experimental.text_splitter import SemanticChunker
 from langchain_google_genai import GoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from neo4j import GraphDatabase
 
-from utils.config import GEMINI_API_KEY, NEO4J_PASSWORD, NEO4J_URI, NEO4J_USERNAME
+from utils.config import GEMINI_API_KEY, NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 from utils.prompt import QNA_PROMPT
 
 # ======== Uncomment for local use (Docker handles separately)
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class PDFProcessor:
     """Handles PDF text extraction using pymupdf4llm."""
-
+    def __init__(self): ...
     def extract_text(self, pdf_path):
         """
         Extracts text from a PDF and returns it in Markdown format.
@@ -67,7 +67,9 @@ class TextSplitter:
             if line.startswith("## "):
                 if current_section:
                     sections.append("\n".join(current_section))
-                current_section = [line]
+                    current_section = [line]
+                else:
+                    current_section.append(line)
             else:
                 current_section.append(line)
 
@@ -159,8 +161,13 @@ class DatabaseConnector:
 
                     # Create Chunk node with embedding
                     session.run(
-                        "CREATE (c:Chunk {id: $id, text: $text, embedding: $embedding, pdf_id: $pdf_id})",
-                        id=chunk_id, text=chunk, embedding=embedding, pdf_id=pdf_id
+                        """
+                        CREATE (c:Chunk {id: $id, text: $text, embedding: $embedding, pdf_id: $pdf_id})
+                        """,
+                        id=chunk_id,
+                        text=chunk,
+                        embedding=embedding,
+                        pdf_id=pdf_id,
                     )
 
                     # Create/merge entity nodes and relations
@@ -172,7 +179,8 @@ class DatabaseConnector:
                             MATCH (c:Chunk {id: $chunk_id})
                             CREATE (c)-[:MENTIONS]->(e)
                             """,
-                            entity=entity, chunk_id=chunk_id
+                            entity=entity,
+                            chunk_id=chunk_id,
                         )
             logger.info(f"Stored {len(chunks)} chunks and entities for PDF ID: {pdf_id}")
         except Exception as e:
@@ -190,6 +198,7 @@ class DatabaseConnector:
             with self.driver.session() as session:
                 result = session.run(
                     """
+                    // Find top-k similar chunks
                     MATCH (c:Chunk {pdf_id: $pdf_id})
                     WHERE c.embedding IS NOT NULL
                     WITH c, $query_embedding AS q
@@ -198,10 +207,13 @@ class DatabaseConnector:
                     ORDER BY score DESC
                     LIMIT $top_k
                     WITH collect(c) AS top_chunks
+                    // Find related chunks via entities
                     UNWIND top_chunks AS tc
                     MATCH (tc)-[:MENTIONS]->(e:Entity)<-[:MENTIONS]-(related:Chunk {pdf_id: $pdf_id})
                     WHERE related <> tc
-                    WITH top_chunks + collect(DISTINCT related) AS all_chunks
+                    WITH top_chunks, collect(DISTINCT related) AS related_chunks
+                    // Combine and return unique chunks
+                    WITH top_chunks + related_chunks AS all_chunks
                     UNWIND all_chunks AS chunk
                     RETURN DISTINCT chunk.text AS text
                     """,
@@ -248,28 +260,40 @@ class DatabaseConnector:
 class Retriever:
     """Wrapper class to access retrieval logic via the DatabaseConnector."""
 
-    def __init__(self, db_connector):
+    def __init__(self, db_connector: DatabaseConnector):
         self.db_connector = db_connector
 
     def retrieve(self, query_embedding, pdf_id, top_k=5):
+        """Fetches top-k relevant chunks from the database for a specific PDF."""
         return self.db_connector.retrieve_similar(query_embedding, pdf_id, top_k)
 
 
 def clean_context(context):
-    """
-    Cleans and deduplicates retrieved text chunks for better LLM input.
+    # 1. Normalize spaces
+    context = context.strip()
+    context = re.sub(
+        r"\s+", " ", context
+    )  # collapse all whitespace (including \n) into single spaces
 
-    Args:
-        context (str): Raw joined context.
+    # 2. Re-split into paragraphs (assuming paragraphs end with a dot + space or line breaks)
+    paragraphs = re.split(r"(?<=[.?!])\s+", context)
 
-    Returns:
-        str: Cleaned context.
-    """
-    context = re.sub(r"\s+", " ", context.strip())
-    paragraphs = [p.strip() for p in re.split(r"(?<=[.?!])\s+", context) if p.strip()]
+    # 3. Strip each paragraph individually
+    paragraphs = [p.strip() for p in paragraphs if p.strip()]
+
+    # 4. Optionally: Deduplicate paragraphs
+
     seen = set()
-    unique = [p for p in paragraphs if not (p in seen or seen.add(p))]
-    return "\n\n".join(unique)
+    unique_paragraphs = []
+    for para in paragraphs:
+        if para not in seen:
+            unique_paragraphs.append(para)
+            seen.add(para)
+
+    # 5. Re-join nicely
+    cleaned_context = "\n\n".join(unique_paragraphs)
+
+    return cleaned_context
 
 
 class Generator:
@@ -290,23 +314,35 @@ class Generator:
             dict: Contains question, answer, and references.
         """
         try:
-            context = clean_context("\n".join(chunks))
-            prompt = QNA_PROMPT.format(question=question, context=context)
-            response = self.llm.invoke(prompt)
-
-            logger.info(f"Generated answer for: '{question}'")
-
-            if "Answer" in response and "References: " in response:
-                answer, ref = response.split("References: ")
-                return {
-                    "question": question,
-                    "answer": answer.replace("Answer: ", "").strip(),
-                    "references": ref.strip()
-                }
+            context = "\n".join(chunks)
+            prompt = QNA_PROMPT.format(
+                question=question, context=clean_context(context)
+            )
+            answer = self.llm.invoke(prompt)
+            logger.info(f"Generated answer for question: {question}")
+            response = {}
+            if "Answer" in answer and "References: " in answer:
+                ans, ref = answer.split("References: ")
+                response.update(
+                    {
+                        "question": question,
+                        "answer": ans.replace("Answer: ", "").strip(),
+                        "references": ref.strip(),
+                    }
+                )
             else:
-                return {"question": question, "answer": response.strip(), "references": None}
+                response.update(
+                    {
+                        "question": question,
+                        "answer": answer.strip(),
+                        "references": None,
+                    }
+                )
+
+            # return answer
+            return response
         except Exception as e:
-            logger.error(f"Failed to generate answer: {e}")
+            logger.error(f"Error generating answer: {e}")
             raise
 
 
@@ -316,35 +352,48 @@ class RAGSystem:
     def __init__(self):
         self.pdf_processor = PDFProcessor()
         self.text_splitter = TextSplitter()
-        self.embedder = Embedder()
+        self.embedder = Embedder(model_name="models/text-embedding-004")
         self.db_connector = DatabaseConnector(NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD)
         self.retriever = Retriever(self.db_connector)
-        self.generator = Generator()
+        self.generator = Generator(model_name="models/gemini-2.0-flash")
 
     def process_pdf(self, pdf_path):
-        """
-        Processes a PDF, splits, embeds, extracts entities and stores them.
-
-        Returns:
-            str: Unique PDF ID.
-        """
-        pdf_id = str(uuid.uuid4())
-        text = self.pdf_processor.extract_text(pdf_path)
-        chunks = self.text_splitter.split_text(text)
-        entity_extractor = EntityExtractor()
-        entities = [entity_extractor.extract_entities(chunk) for chunk in chunks]
-        embeddings = self.embedder.embed_documents(chunks)
-        self.db_connector.store_embeddings(chunks, embeddings, pdf_id, entities)
-        logger.info(f"Completed processing PDF: {pdf_path} (ID: {pdf_id})")
-        return pdf_id
+        """Processes a PDF file, extracts entities, and stores embeddings in Neo4j."""
+        try:
+            pdf_id = str(uuid.uuid4())
+            text = self.pdf_processor.extract_text(pdf_path)
+            chunks = self.text_splitter.split_text(text)
+            # Extract entities for each chunk
+            entity_extractor = EntityExtractor()
+            entities_list = [
+                entity_extractor.extract_entities(chunk) for chunk in chunks
+            ]
+            embeddings = self.embedder.embed_documents(chunks)
+            self.db_connector.store_embeddings(
+                chunks, embeddings, pdf_id, entities_list
+            )
+            # print(f"Stored {len(chunks)} chunks with embeddings and entities")
+            logger.info(
+                f"Processed and stored embeddings and entities for {pdf_path} with PDF ID ({pdf_id})"
+            )
+            return pdf_id
+        except Exception as e:
+            logger.error(f"Error processing PDF {pdf_path}: {e}")
+            raise
 
     def answer_question(self, question, pdf_id):
-        """Runs full retrieval-augmented generation for a question."""
-        query_embedding = self.embedder.embed(question)
-        chunks = self.retriever.retrieve(query_embedding, pdf_id, top_k=5)
-        return self.generator.generate_answer(question, chunks)
+        """Answers a user question based on the stored data from a specific PDF."""
+        try:
+            query_embedding = self.embedder.embed(question)
+            relevant_chunks = self.retriever.retrieve(query_embedding, pdf_id, top_k=5)
+            answer = self.generator.generate_answer(question, relevant_chunks)
+            return answer
+        except Exception as e:
+            logger.error(f"Error answering question: {e}")
+            raise
 
     def close(self):
+        """Closes the database connection."""
         self.db_connector.close()
 
 
@@ -354,31 +403,33 @@ PDF_ID = None
 RAG_SYSTEM = RAGSystem()
 
 
+
 def current_pdf():
-    """Returns the current global PDF ID."""
+    global PDF_ID
     return PDF_ID
 
 
 def read_pdf(pdf_path: str):
-    """Processes and stores a PDF document."""
-    global PDF_ID
-    PDF_ID = RAG_SYSTEM.process_pdf(pdf_path)
-    return PDF_ID
+    """Reads a PDF file and processes it."""
+    # global PDF_ID
+    pdf_id = RAG_SYSTEM.process_pdf(pdf_path)
+    return pdf_id
 
 
 def clear_pdf(pdf_id: str):
-    """Deletes all data associated with a processed PDF."""
-    if pdf_id:
+    """Clears the processed PDF data."""
+    if pdf_id is not None:
         RAG_SYSTEM.db_connector.delete_pdf_graph(pdf_id)
         logger.info("Cleared processed PDF data")
         return True
-    logger.warning("No PDF data to clear")
-    return False
+    else:
+        logger.warning("No PDF data to clear")
+        return False
 
 
 def qna(question: str, pdf_id: str):
-    """Answers a question based on stored PDF context."""
-    if not pdf_id:
+    """Answers a question based on the processed PDF."""
+    if pdf_id is None:
         raise ValueError("No PDF has been processed. Please upload a PDF first.")
     return RAG_SYSTEM.answer_question(question, pdf_id)
 

@@ -1,6 +1,6 @@
 # Additional Defined Unpush
 neo4j_db/
-file/
+files/
 *.db
 logs/
 

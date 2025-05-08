@@ -12,7 +12,7 @@ from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from sqlite_db.db_functions import *
+from database.db_functions import *
 from utils import config # To start the logger first
 
 # Initialize FastAPI app

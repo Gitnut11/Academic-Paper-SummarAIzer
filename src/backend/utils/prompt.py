@@ -49,7 +49,7 @@ Please respond with only one word: either "safe" or "unsafe", without any additi
 
 # Help Message
 HELPER = """
-- `/summarize` + text or [sections_id]: to summarize text or sections.
+- `/summarize`: to summarize the inputted paper again.
 - `/sections`: show list of detected sections.
 - `/help`: show this help message.
 Other inputs are treated as Q&A prompt for this paper!
