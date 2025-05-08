@@ -18,7 +18,7 @@ A high-level view of your LLM system lifecycle, from data ingestion and training
 
 <div align="center" style="text-align: center;">
     <img src="assets/LLMOps.png" alt="LLMOps" style="display: block; margin: auto;" width="600">
-    <em>Figure 1: A high-level lifecycle view of deploying LLM-based applications—from data acquisition to continuous evaluation and monitoring.</em>
+    <div style="font-style: italic;">Figure 1: A high-level lifecycle view of deploying LLM-based applications—from data acquisition to continuous evaluation and monitoring.</div>
 </div>
 <br>
 
@@ -53,7 +53,7 @@ Ask natural-language questions about uploaded papers. Relevant chunks are retrie
 
 <div align="center" style="text-align: center;">
     <img src="assets/qna.png" alt="QNA" style="display: block; margin: auto;" width="600">
-    <div style="font-style: italic;">Figure 4: Demonstrates the Q&A interface where users input natural language questions and receive context-aware answers from the document.</div>
+    <div style="font-style: italic;">Figure 4: Demonstrates the Q&A interface where input natural language questions and receive context-aware answers from the document.</div>
 </div>
 <br>
 
